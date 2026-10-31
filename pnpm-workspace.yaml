@@ -1,0 +1,4 @@
+# pnpm settings (pnpm 12 reads these here, not from package.json).
+# Build scripts that npm used to run implicitly; pnpm blocks them unless allowed.
+allowBuilds:
+  electron: true

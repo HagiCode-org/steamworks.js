@@ -1,7 +1,7 @@
 /target
 /dist
 node_modules
-test/**/package-lock.json
+test/**/pnpm-lock.yaml
 test/electron/steamworks.js-electron-test-*
 
 sdk/*
