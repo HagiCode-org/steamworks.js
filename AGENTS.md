@@ -38,10 +38,10 @@ Notes for AI coding assistants. Everything below was checked against the reposit
 
 ## Build, test, format
 
-- Build (needs Node, Rust, Clang, and a recent `vendor/steamworks-rs` checkout): `npm install`, then `npm run build:debug` (or `npm run build` for `--release`). Cross-target builds are done only in CI; locally you build for your own platform. `npm run prune` removes `dist`, `target`, `client.d.ts`.
-- Format/lint: `npm run format` (= `cargo clippy --fix --allow-staged && cargo fmt`). CI runs `cargo fmt --all --check` and `cargo clippy`.
-- Type check (what CI runs in `typescript-smoke-test.yml`): `npm install`, then `cd test/typescript && npm install && npm run compile` (`tsc --noEmit --strict index.ts`).
-- Other tests are manual and require a running Steam client (default AppID 480 in examples); see `test/README.md`. Electron check: `cd test/electron && npm install && npm start`.
+- Build (needs Node, Rust, Clang, and a recent `vendor/steamworks-rs` checkout): `pnpm install`, then `pnpm run build:debug` (or `pnpm run build` for `--release`). Cross-target builds are done only in CI; locally you build for your own platform. `pnpm run prune` removes `dist`, `target`, `client.d.ts`.
+- Format/lint: `pnpm run format` (= `cargo clippy --fix --allow-staged && cargo fmt`). CI runs `cargo fmt --all --check` and `cargo clippy`.
+- Type check (what CI runs in `typescript-smoke-test.yml`): `pnpm install`, then `cd test/typescript && pnpm install && pnpm run compile` (`tsc --noEmit --strict index.ts`).
+- Other tests are manual and require a running Steam client (default AppID 480 in examples); see `test/README.md`. Electron check: `cd test/electron && pnpm install && pnpm start`.
 - JS/TS style (`.prettierrc`): single quotes, no semicolons, trailing commas, 4-space tabs, print width 140, LF.
 
 ## Conventions

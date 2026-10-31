@@ -7,7 +7,7 @@ This directory contains smoke tests for the steamworks.js library.
 Before running any tests, you need to build the project first:
 
 ```bash
-npm run build:debug
+pnpm run build:debug
 ```
 
 ### Additional Previews Smoke Test

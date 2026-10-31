@@ -58,7 +58,7 @@ If you were using the unscoped `steamworks.js` package, update your `package.jso
 }
 ```
 
-Then run `npm install`. Your `require('steamworks.js')` statements will continue to work without changes.
+Then run `pnpm install`. Your `require('steamworks.js')` statements will continue to work without changes.
 
 ### Electron
 
@@ -106,13 +106,13 @@ git submodule update --init --recursive
 
 ### Building
 
-Install dependencies with `npm install` and then run `npm run build:debug` to build the library.
+Install dependencies with `pnpm install` and then run `pnpm run build:debug` to build the library.
 
 There is no way to build for all targets easily. The good news is that you don't need to. You can develop and test on your current target, and open a PR. When the code is merged to main, a github action will build for all targets and publish a new version.
 
 ### Testing Electron
 
-Go to the [test/electron](./test/electron) directory. There, you can run `npm install` and then `npm start` to run the Electron app.
+Go to the [test/electron](./test/electron) directory. There, you can run `pnpm install` and then `pnpm start` to run the Electron app.
 
 Click "activate overlay" to test the overlay.
 

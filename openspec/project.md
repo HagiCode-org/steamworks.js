@@ -32,7 +32,7 @@ steamworks.js is a modern Steamworks SDK implementation for HTML/JS and Node.js 
 - **Rust**:
   - Use `cargo fmt` for formatting
   - Use `cargo clippy` for linting
-  - Run `npm run format` to apply both
+  - Run `pnpm run format` to apply both
 
 ### Architecture Patterns
 - **N-API based**: Rust implementation exposed to Node.js via N-API

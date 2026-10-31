@@ -2,7 +2,7 @@
  * Smoke test for AdditionalPreview type definitions.
  * This test verifies that the additional previews types are correctly exported.
  *
- * NOTE: This test requires the project to be built first with `npm run build:debug`
+ * NOTE: This test requires the project to be built first with `pnpm run build:debug`
  *       and Steam client must be running.
  */
 
