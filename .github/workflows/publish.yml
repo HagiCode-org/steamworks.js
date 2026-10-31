@@ -56,6 +56,9 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -112,12 +115,12 @@ jobs:
         run: npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version
 
       - name: Node install
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: |
-          npm run build -- --target x86_64-unknown-linux-gnu &
-          npm run build -- --target x86_64-pc-windows-msvc &
+          pnpm run build --target x86_64-unknown-linux-gnu &
+          pnpm run build --target x86_64-pc-windows-msvc &
           wait
 
       - name: Upload artifact
@@ -135,6 +138,9 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -185,13 +191,13 @@ jobs:
         run: npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version
 
       - name: Node install
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Mac x64
-        run: npm run build -- --target x86_64-apple-darwin
+        run: pnpm run build --target x86_64-apple-darwin
 
       - name: Build Mac arm64
-        run: npm run build -- --target aarch64-apple-darwin
+        run: pnpm run build --target aarch64-apple-darwin
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

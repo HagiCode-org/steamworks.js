@@ -14,6 +14,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -21,8 +24,8 @@ jobs:
 
       - name: Install NPM dependencies
         run: |
-          npm install
-          cd test/typescript && npm install
+          pnpm install
+          cd test/typescript && pnpm install
 
       - name: Compile TypeScript sources
-        run: cd test/typescript && npm run compile
+        run: cd test/typescript && pnpm run compile
