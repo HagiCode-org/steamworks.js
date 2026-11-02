@@ -7,7 +7,7 @@ pub mod workshop {
     use napi::threadsafe_function::ThreadsafeFunction;
     use napi::threadsafe_function::ThreadsafeFunctionCallMode;
     use std::path::Path;
-    use steamworks::{FileType, PublishedFileId, UpdateHandle};
+    use steamworks::{FileType, PublishedFileId, SteamError, UpdateHandle};
     use tokio::sync::oneshot;
 
     #[napi(object)]
@@ -158,17 +158,15 @@ pub mod workshop {
         client
             .ugc()
             .create_item(app_id, FileType::Community, |result| {
-                tx.send(result).unwrap();
+                send_completion(tx, result);
             });
 
-        let result = rx.await.unwrap();
-        match result {
-            Ok((item_id, needs_to_accept_agreement)) => Ok(UgcResult {
-                item_id: BigInt::from(item_id.0),
-                needs_to_accept_agreement,
-            }),
-            Err(e) => Err(Error::from_reason(e.to_string())),
-        }
+        let (item_id, needs_to_accept_agreement) =
+            await_completion(rx, "creating the Workshop item").await?;
+        Ok(UgcResult {
+            item_id: BigInt::from(item_id.0),
+            needs_to_accept_agreement,
+        })
     }
 
     #[napi]
@@ -191,18 +189,16 @@ pub mod workshop {
                 .start_item_update(app_id, PublishedFileId(item_id.get_u64().1));
 
             update_details.submit(update_handle, |result| {
-                tx.send(result).unwrap();
+                send_completion(tx, result);
             });
         };
 
-        let result = rx.await.unwrap();
-        match result {
-            Ok((item_id, needs_to_accept_agreement)) => Ok(UgcResult {
-                item_id: BigInt::from(item_id.0),
-                needs_to_accept_agreement,
-            }),
-            Err(e) => Err(Error::from_reason(e.to_string())),
-        }
+        let (item_id, needs_to_accept_agreement) =
+            await_completion(rx, "updating the Workshop item").await?;
+        Ok(UgcResult {
+            item_id: BigInt::from(item_id.0),
+            needs_to_accept_agreement,
+        })
     }
 
     #[napi]
@@ -294,14 +290,10 @@ pub mod workshop {
         client
             .ugc()
             .subscribe_item(PublishedFileId(item_id.get_u64().1), |result| {
-                tx.send(result).unwrap();
+                send_completion(tx, result);
             });
 
-        let result = rx.await.unwrap();
-        match result {
-            Ok(()) => Ok(()),
-            Err(e) => Err(Error::from_reason(e.to_string())),
-        }
+        await_completion(rx, "subscribing to the Workshop item").await
     }
 
     /// Unsubscribe from a workshop item. This will result in the item being removed after the game quits.
@@ -315,14 +307,10 @@ pub mod workshop {
         client
             .ugc()
             .unsubscribe_item(PublishedFileId(item_id.get_u64().1), |result| {
-                tx.send(result).unwrap();
+                send_completion(tx, result);
             });
 
-        let result = rx.await.unwrap();
-        match result {
-            Ok(()) => Ok(()),
-            Err(e) => Err(Error::from_reason(e.to_string())),
-        }
+        await_completion(rx, "unsubscribing from the Workshop item").await
     }
 
     /// Gets the current state of a workshop item on this client. States can be combined.
@@ -419,13 +407,104 @@ pub mod workshop {
         client
             .ugc()
             .delete_item(PublishedFileId(item_id.get_u64().1), |result| {
-                tx.send(result).unwrap();
+                send_completion(tx, result);
             });
 
-        let result = rx.await.unwrap();
-        match result {
-            Ok(()) => Ok(()),
-            Err(e) => Err(Error::from_reason(e.to_string())),
+        await_completion(rx, "deleting the Workshop item").await
+    }
+
+    /// Hand a Steam completion to the awaiting call. If nobody is waiting any more the value is
+    /// dropped: this runs on Steam's callback path, and a panic there would abort the process.
+    pub(crate) fn send_completion<T>(tx: oneshot::Sender<T>, value: T) {
+        let _ = tx.send(value);
+    }
+
+    /// Wait for a Steam completion. A closed channel means no completion arrived, so the outcome
+    /// of the operation is unknown and the caller must check the item before deciding.
+    pub(crate) async fn await_completion<T>(
+        rx: oneshot::Receiver<Result<T, SteamError>>,
+        operation: &str,
+    ) -> Result<T, Error> {
+        match rx.await {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(e)) => Err(Error::from_reason(e.to_string())),
+            Err(_) => Err(Error::from_reason(format!(
+                "The completion of {operation} was not received; the outcome is unknown. Check the item before retrying."
+            ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::workshop::{await_completion, send_completion};
+    use steamworks::SteamError;
+    use tokio::sync::oneshot;
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn completion_with_dropped_receiver_does_not_panic() {
+        let (tx, rx) = oneshot::channel::<Result<(), SteamError>>();
+        drop(rx);
+        send_completion(tx, Ok(()));
+    }
+
+    #[test]
+    fn dropped_sender_gives_a_readable_outcome_unknown_error() {
+        let (tx, rx) = oneshot::channel::<Result<(), SteamError>>();
+        drop(tx);
+        let error = runtime()
+            .block_on(await_completion(rx, "deleting the Workshop item"))
+            .unwrap_err();
+        assert!(
+            error.reason.contains("completion"),
+            "reason was: {}",
+            error.reason
+        );
+        assert!(
+            error.reason.contains("not received"),
+            "reason was: {}",
+            error.reason
+        );
+        assert!(
+            error.reason.contains("outcome is unknown"),
+            "reason was: {}",
+            error.reason
+        );
+        assert!(
+            !error.reason.contains("RecvError"),
+            "reason was: {}",
+            error.reason
+        );
+    }
+
+    #[test]
+    fn delivered_success_resolves_with_the_value() {
+        let (tx, rx) = oneshot::channel::<Result<u32, SteamError>>();
+        send_completion(tx, Ok(7));
+        assert_eq!(runtime().block_on(await_completion(rx, "op")).unwrap(), 7);
+    }
+
+    #[test]
+    fn delivered_steam_error_keeps_its_number() {
+        let (tx, rx) = oneshot::channel::<Result<(), SteamError>>();
+        send_completion(tx, Err(SteamError::UnknownResult(1234)));
+        let error = runtime().block_on(await_completion(rx, "op")).unwrap_err();
+        assert!(
+            error.reason.contains("1234"),
+            "reason was: {}",
+            error.reason
+        );
+        assert!(
+            !error.reason.contains("not received"),
+            "reason was: {}",
+            error.reason
+        );
     }
 }

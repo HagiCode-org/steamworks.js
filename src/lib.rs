@@ -22,6 +22,9 @@ pub fn init(app_id: Option<u32>) -> Result<(), Error> {
             SteamAPIInitError::FailedGeneric(msg)
             | SteamAPIInitError::NoSteamClient(msg)
             | SteamAPIInitError::VersionMismatch(msg) => Error::from_reason(msg),
+            SteamAPIInitError::UnknownResult(code, msg) => {
+                Error::from_reason(format!("unknown Steam init result {code}: {msg}"))
+            }
         })?;
 
     let steam_id = steam_client.user().steam_id().raw();
