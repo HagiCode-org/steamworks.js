@@ -1,6 +1,6 @@
 ## OpenSpec
 
-This repo has no `openspec/` directory. OpenSpec for all `ducky7go-mono` sub-repos lives in the parent repo: `../../openspec/` (workflow rules `../../openspec/AGENTS.md`, specs `../../openspec/specs/`, changes `../../openspec/changes/`). This repo's former project context is `../../openspec/projects/steamworks.js/project.md`.
+This repo has no `openspec/` directory. OpenSpec for all `ducky7go-mono` sub-repos lives in the parent repo: `../../openspec/` (workflow rules `../../openspec/AGENTS.md`, specs `../../openspec/specs/`, changes `../../openspec/changes/`).
 
 
 # steamworks.js
@@ -40,8 +40,7 @@ Notes for AI coding assistants. Everything below was checked against the reposit
 ## Gotchas
 
 - `CLAUDE.md` is only a copy of the OpenSpec block plus release notes; its "dev version" rule (`{latest}-dev.{commit_count}`, queried from the GitHub API) does not match `publish.yml`, which uses GitVersion `fullSemVer`.
-- `../../openspec/projects/steamworks.js/project.md` pins the submodule commit `9841b63...`; the current gitlink in HEAD is `59796fd88a3b88b93c66098d80a8077f70da0193`.
 - `test/README.md` says `node tests/additional-previews-smoke-test.js` but the directory is `test/`.
 - README still mentions copying from `sdk/redistributable_bin/...` for production Electron builds; `build.js` actually sources from `vendor/steamworks-rs/steamworks-sys/lib/steam/redistributable_bin`.
-- Steam must be running and an AppID (`steam_appid.txt` or `init(appId)`) must be available for runtime tests. The Steamworks SDK is Valve's proprietary SDK (`../../openspec/projects/steamworks.js/project.md`).
+- Steam must be running and an AppID (`steam_appid.txt` or `init(appId)`) must be available for runtime tests. The Steamworks SDK is Valve's proprietary SDK.
 - Changing the submodule pointer means a matching commit must exist in `ducky7go/steamworks-rs`.
