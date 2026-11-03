@@ -53,6 +53,8 @@ pub mod workshop {
         pub description: Option<String>,
         pub change_note: Option<String>,
         pub preview_path: Option<String>,
+        /// Image files appended to the item's additional previews (screenshots).
+        pub additional_preview_paths: Option<Vec<String>>,
         pub content_path: Option<String>,
         pub tags: Option<Vec<String>>,
         pub visibility: Option<UgcItemVisibility>,
@@ -81,6 +83,15 @@ pub mod workshop {
 
             if let Some(preview_path) = self.preview_path {
                 update = update.preview_path(Path::new(&preview_path));
+            }
+
+            if let Some(paths) = self.additional_preview_paths {
+                for path in paths {
+                    update = update.add_preview_file(
+                        Path::new(&path),
+                        steamworks::sys::EItemPreviewType::k_EItemPreviewType_Image,
+                    );
+                }
             }
 
             if let Some(tags) = self.tags {

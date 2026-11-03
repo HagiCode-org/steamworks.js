@@ -257,6 +257,8 @@ export declare namespace workshop {
     description?: string
     changeNote?: string
     previewPath?: string
+    /** Image files appended to the item's additional previews (screenshots). */
+    additionalPreviewPaths?: Array<string>
     contentPath?: string
     tags?: Array<string>
     visibility?: UgcItemVisibility

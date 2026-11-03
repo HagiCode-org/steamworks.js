@@ -1,5 +1,19 @@
 {
 	"name": "@ducky7go/steamworks.js",
+	"description": "Node.js and Electron bindings for the Steamworks SDK: Steam Workshop, achievements, stats, cloud, overlay, networking.",
+	"keywords": [
+		"steam",
+		"steamworks",
+		"steamworks-sdk",
+		"workshop",
+		"ugc",
+		"napi",
+		"electron"
+	],
+	"homepage": "https://github.com/ducky7go/steamworks.js#readme",
+	"bugs": {
+		"url": "https://github.com/ducky7go/steamworks.js/issues"
+	},
 	"version": "0.0.1",
 	"main": "index.js",
 	"types": "index.d.ts",
@@ -37,7 +51,10 @@
 		"build": "node build --release",
 		"build:debug": "node build",
 		"prune": "rimraf dist target client.d.ts",
-		"format": "cargo clippy --fix --allow-staged && cargo fmt"
+		"format": "cargo clippy --fix --allow-staged && cargo fmt",
+		"prepack": "node scripts/check-package.js",
+		"test:offline": "node test/offline-smoke-test.js",
+		"test:types": "cd test/typescript && pnpm run compile"
 	},
 	"repository": {
 		"type": "git",
