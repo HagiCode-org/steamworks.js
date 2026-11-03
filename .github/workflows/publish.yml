@@ -123,6 +123,11 @@ jobs:
           pnpm run build --target x86_64-pc-windows-msvc &
           wait
 
+      - name: Check committed typings match the native build
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code -- client.d.ts || (echo "client.d.ts is stale: rebuild and commit it" && exit 1)
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
