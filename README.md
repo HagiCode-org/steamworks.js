@@ -120,6 +120,26 @@ Click "activate overlay" to test the overlay.
 
 Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on commit conventions and the pull request process.
 
+## Workshop Screenshots (Additional Previews)
+
+Besides the main preview, a Workshop item can show extra screenshots. Read them with `includeAdditionalPreviews`, and add more with `additionalPreviewPaths` (an update that carries only the new images):
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// list: each entry has urlOrVideoId, originalFilename and previewType (ItemPreviewType)
+const item = await client.workshop.getItem(itemId, { includeAdditionalPreviews: true })
+console.log(item.additionalPreviews)
+
+// add: appended to the item's screenshots; no content and no title change are sent
+await client.workshop.updateItem(itemId, { additionalPreviewPaths: ['/abs/path/shot-2.png'] }, appId)
+```
+
+- Screenshots are append-only in this API: there is no call to remove or reorder them.
+- Steam lists screenshots by file name. Send only the files that are not listed yet, otherwise they are added again.
+- Adding screenshots needs a Steam client that is running and logged in, and an account that owns the app.
+
 ## Workshop Multilingual Support
 
 Steamworks.js supports localized content for Steam Workshop items. You can update the title and description for different languages using the `language` parameter.
