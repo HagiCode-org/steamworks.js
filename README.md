@@ -134,9 +134,13 @@ console.log(item.additionalPreviews)
 
 // add: appended to the item's screenshots; no content and no title change are sent
 await client.workshop.updateItem(itemId, { additionalPreviewPaths: ['/abs/path/shot-2.png'] }, appId)
+
+// remove: pass the 0-based indexes from `additionalPreviews`; the main preview is not affected
+await client.workshop.updateItem(itemId, { removeAdditionalPreviewIndexes: [0, 2] }, appId)
 ```
 
-- Screenshots are append-only in this API: there is no call to remove or reorder them.
+- Removals run before additions in the same update, from the highest index down. Indexes always refer to the list as it was before this update, so read the list again before removing.
+- Screenshots cannot be reordered through this API. The main preview is replaced with `previewPath`, not removed.
 - Steam lists screenshots by file name. Send only the files that are not listed yet, otherwise they are added again.
 - Adding screenshots needs a Steam client that is running and logged in, and an account that owns the app.
 

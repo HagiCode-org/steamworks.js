@@ -259,6 +259,8 @@ export declare namespace workshop {
     previewPath?: string
     /** Image files appended to the item's additional previews (screenshots). */
     additionalPreviewPaths?: Array<string>
+    /** 0-based indexes of additional previews to remove, as listed in `additionalPreviews`. */
+    removeAdditionalPreviewIndexes?: Array<number>
     contentPath?: string
     tags?: Array<string>
     visibility?: UgcItemVisibility

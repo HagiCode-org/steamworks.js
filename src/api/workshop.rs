@@ -55,6 +55,8 @@ pub mod workshop {
         pub preview_path: Option<String>,
         /// Image files appended to the item's additional previews (screenshots).
         pub additional_preview_paths: Option<Vec<String>>,
+        /// 0-based indexes of additional previews to remove, as listed in `additionalPreviews`.
+        pub remove_additional_preview_indexes: Option<Vec<u32>>,
         pub content_path: Option<String>,
         pub tags: Option<Vec<String>>,
         pub visibility: Option<UgcItemVisibility>,
@@ -83,6 +85,15 @@ pub mod workshop {
 
             if let Some(preview_path) = self.preview_path {
                 update = update.preview_path(Path::new(&preview_path));
+            }
+
+            if let Some(mut indexes) = self.remove_additional_preview_indexes {
+                // Remove from the highest index down, so a removal does not shift an index still to be removed.
+                indexes.sort_unstable_by(|a, b| b.cmp(a));
+                indexes.dedup();
+                for index in indexes {
+                    update = update.remove_preview(index);
+                }
             }
 
             if let Some(paths) = self.additional_preview_paths {
