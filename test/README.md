@@ -10,6 +10,15 @@ Before running any tests, you need to build the project first:
 pnpm run build:debug
 ```
 
+### Offline Checks
+
+These run without a Steam client, a Steam account or an AppID:
+
+```bash
+pnpm run test:offline   # module loads; init, workshop.addDependency and workshop.removeDependency are exported
+pnpm run test:types     # strict TypeScript check of test/typescript/index.ts against the generated typings
+```
+
 ### Additional Previews Smoke Test
 
 Tests the `ItemPreviewType` enum values are correctly exported:

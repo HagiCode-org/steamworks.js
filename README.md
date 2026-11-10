@@ -144,6 +144,30 @@ await client.workshop.updateItem(itemId, { removeAdditionalPreviewIndexes: [0, 2
 - Steam lists screenshots by file name. Send only the files that are not listed yet, otherwise they are added again.
 - Adding screenshots needs a Steam client that is running and logged in, and an account that owns the app.
 
+## Workshop Item Dependencies
+
+A Workshop item can require another item, so Steam installs the required item along with it. `addDependency` and `removeDependency` take the parent and the child as `bigint` ids and resolve with the Steam result code. `1` means OK. Any other code is a Steam failure reason, and it arrives as a resolved number, not a rejection.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+const modId = 123456789n        // your mod: an item owned by the logged-in account
+const requiredId = 3836453389n  // the required child item (Outing Picker)
+
+// mark the child as required by the mod
+const added = await client.workshop.addDependency(modId, requiredId)
+if (added !== 1) {
+  console.error(`Steam refused the dependency, result code ${added}`)
+}
+
+// remove it again; the result code is returned the same way
+const removed = await client.workshop.removeDependency(modId, requiredId)
+```
+
+- Both calls need a running, logged-in Steam client, and the parent must be an item the logged-in account owns.
+- An id that is negative or does not fit in 64 bits rejects before any Steam call. A failed call with no completion also rejects, and the error says the outcome is unknown, so check the item before retrying.
+
 ## Workshop Multilingual Support
 
 Steamworks.js supports localized content for Steam Workshop items. You can update the title and description for different languages using the `language` parameter.
