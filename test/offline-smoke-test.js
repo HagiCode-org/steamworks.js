@@ -9,4 +9,17 @@ assert.equal(typeof steamworks.shutdown, 'function', 'shutdown is exported')
 assert.equal(typeof steamworks.isConnected, 'function', 'isConnected is exported')
 assert.equal(typeof steamworks.restartAppIfNecessary, 'function', 'restartAppIfNecessary is exported')
 
-console.log('offline smoke test passed')
+// The workshop namespace lives on the native binding; init() only spreads it into the client it returns.
+// Load this platform's binding directly, so the dependency functions are checked without calling init.
+const bindingPaths = {
+    'win32-x64': '../dist/win64/steamworksjs.win32-x64-msvc.node',
+    'linux-x64': '../dist/linux64/steamworksjs.linux-x64-gnu.node',
+    'darwin-x64': '../dist/osx/steamworksjs.darwin-x64.node',
+    'darwin-arm64': '../dist/osx/steamworksjs.darwin-arm64.node',
+}
+const nativeBinding = require(bindingPaths[`${process.platform}-${process.arch}`])
+
+assert.equal(typeof nativeBinding.workshop.addDependency, 'function', 'workshop.addDependency is exported')
+assert.equal(typeof nativeBinding.workshop.removeDependency, 'function', 'workshop.removeDependency is exported')
+
+console.log('offline smoke test passed (workshop.addDependency and workshop.removeDependency are exported)')

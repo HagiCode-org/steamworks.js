@@ -344,6 +344,17 @@ export declare namespace workshop {
    */
   export function getSubscribedItems(): Array<bigint>
   export function deleteItem(itemId: bigint): Promise<void>
+  /**
+   * Marks `childId` as a required item of `parentId`. Resolves with the Steam result code, where `1` is
+   * OK. A non-OK code (for example a missing child or a denied request) resolves rather than rejects.
+   * Rejects on an invalid id (checked before any Steam call), an I/O failure, or a lost completion.
+   */
+  export function addDependency(parentId: bigint, childId: bigint): Promise<number>
+  /**
+   * Removes the required-item dependency from `parentId` to `childId`. Resolves with the Steam result
+   * code (`1` is OK), with the same validation and rejection rules as `addDependency`.
+   */
+  export function removeDependency(parentId: bigint, childId: bigint): Promise<number>
   export const enum UGCQueryType {
     RankedByVote = 0,
     RankedByPublicationDate = 1,

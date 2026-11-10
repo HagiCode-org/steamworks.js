@@ -435,6 +435,56 @@ pub mod workshop {
         await_completion(rx, "deleting the Workshop item").await
     }
 
+    /// Marks `childId` as a required item of `parentId`. Resolves with the Steam result code, where `1` is
+    /// OK. A non-OK code (for example a missing child or a denied request) resolves rather than rejects.
+    /// Rejects on an invalid id (checked before any Steam call), an I/O failure, or a lost completion.
+    #[napi]
+    pub async fn add_dependency(parent_id: BigInt, child_id: BigInt) -> Result<u32, Error> {
+        let parent = published_file_id_arg("parentId", &parent_id)?;
+        let child = published_file_id_arg("childId", &child_id)?;
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+
+        client.ugc().add_dependency(parent, child, |result| {
+            send_completion(tx, result);
+        });
+
+        let outcome = await_completion(rx, "adding the Workshop item dependency").await?;
+        Ok(outcome.result)
+    }
+
+    /// Removes the required-item dependency from `parentId` to `childId`. Resolves with the Steam result
+    /// code (`1` is OK), with the same validation and rejection rules as `addDependency`.
+    #[napi]
+    pub async fn remove_dependency(parent_id: BigInt, child_id: BigInt) -> Result<u32, Error> {
+        let parent = published_file_id_arg("parentId", &parent_id)?;
+        let child = published_file_id_arg("childId", &child_id)?;
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+
+        client.ugc().remove_dependency(parent, child, |result| {
+            send_completion(tx, result);
+        });
+
+        let outcome = await_completion(rx, "removing the Workshop item dependency").await?;
+        Ok(outcome.result)
+    }
+
+    /// Reads a Workshop item id argument. It must be a non-negative integer below 2^64. Anything else is
+    /// rejected here, before any Steam call, instead of being truncated to its low 64 bits.
+    pub(crate) fn published_file_id_arg(name: &str, id: &BigInt) -> Result<PublishedFileId, Error> {
+        // Read the words directly: BigInt::get_u64 indexes words[0] and panics on an empty vector.
+        let low = id.words.first().copied().unwrap_or(0);
+        let fits_in_u64 = id.words.iter().skip(1).all(|word| *word == 0);
+        if !fits_in_u64 || (id.sign_bit && low != 0) {
+            return Err(Error::new(
+                napi::Status::InvalidArg,
+                format!("{name} must be a non-negative integer below 2^64"),
+            ));
+        }
+        Ok(PublishedFileId(low))
+    }
+
     /// Hand a Steam completion to the awaiting call. If nobody is waiting any more the value is
     /// dropped: this runs on Steam's callback path, and a panic there would abort the process.
     pub(crate) fn send_completion<T>(tx: oneshot::Sender<T>, value: T) {
@@ -459,9 +509,59 @@ pub mod workshop {
 
 #[cfg(test)]
 mod tests {
-    use super::workshop::{await_completion, send_completion};
-    use steamworks::SteamError;
+    use super::workshop::{await_completion, published_file_id_arg, send_completion};
+    use napi::bindgen_prelude::BigInt;
+    use steamworks::{PublishedFileId, SteamError};
     use tokio::sync::oneshot;
+
+    #[test]
+    fn normal_item_id_is_accepted() {
+        let id = BigInt {
+            sign_bit: false,
+            words: vec![3836453389],
+        };
+        assert_eq!(
+            published_file_id_arg("parentId", &id).unwrap(),
+            PublishedFileId(3836453389)
+        );
+    }
+
+    #[test]
+    fn largest_64_bit_item_id_is_accepted() {
+        let id = BigInt {
+            sign_bit: false,
+            words: vec![u64::MAX],
+        };
+        assert_eq!(
+            published_file_id_arg("parentId", &id).unwrap(),
+            PublishedFileId(u64::MAX)
+        );
+    }
+
+    #[test]
+    fn negative_item_id_is_rejected() {
+        let id = BigInt {
+            sign_bit: true,
+            words: vec![1],
+        };
+        let error = published_file_id_arg("childId", &id).unwrap_err();
+        assert_eq!(error.status, napi::Status::InvalidArg);
+        assert!(
+            error.reason.contains("childId"),
+            "reason was: {}",
+            error.reason
+        );
+    }
+
+    #[test]
+    fn item_id_larger_than_64_bits_is_rejected() {
+        let id = BigInt {
+            sign_bit: false,
+            words: vec![0, 1],
+        };
+        let error = published_file_id_arg("childId", &id).unwrap_err();
+        assert_eq!(error.status, napi::Status::InvalidArg);
+    }
 
     fn runtime() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
