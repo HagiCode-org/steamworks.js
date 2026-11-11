@@ -144,6 +144,26 @@ await client.workshop.updateItem(itemId, { removeAdditionalPreviewIndexes: [0, 2
 - Steam lists screenshots by file name. Send only the files that are not listed yet, otherwise they are added again.
 - Adding screenshots needs a Steam client that is running and logged in, and an account that owns the app.
 
+## Workshop Preview and Content Updates
+
+`updateItem` accepts every field as optional, so a call that carries only `previewPath` or only `contentPath` already updates just that part. Two explicit helpers make that intent obvious and check the path before talking to Steam:
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// replace only the main preview image; the mod files are not uploaded
+await client.workshop.updateItemPreview(itemId, '/abs/path/preview.png', appId, 'New preview')
+
+// upload only the mod folder; the preview image is not touched
+await client.workshop.updateItemContent(itemId, '/abs/path/mod-folder', appId, 'Fix crash on load')
+```
+
+- Signature for both: `(itemId, path, appId?, changeNote?)`. `appId` defaults to the app the client was initialized with, and `changeNote` is optional.
+- `updateItemPreview` rejects when the path is missing or is not a file. `updateItemContent` rejects when the path is missing or is not a folder. Both check before any Steam call.
+- Title, description, tags and visibility are not sent, so they stay as they are. To change them together with a file, keep using `updateItem`.
+- Neither helper reports upload progress. For a large content upload use `updateItemWithCallback`.
+
 ## Workshop Item Dependencies
 
 A Workshop item can require another item, so Steam installs the required item along with it. `addDependency` and `removeDependency` take the parent and the child as `bigint` ids and resolve with the Steam result code. `1` means OK. Any other code is a Steam failure reason, and it arrives as a resolved number, not a rejection.
