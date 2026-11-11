@@ -24,7 +24,7 @@
 // Only steamworks.js 0.1.5 and later can remove screenshots; an older build is refused before Steam is contacted.
 //
 // steamworks.js is found in this order: STEAMWORKS_JS (the package folder that contains index.js), else the
-// @ducky7go/steamworks.js package installed globally (`npm i -g @ducky7go/steamworks.js@0.1.4`). Nothing is read from a fixed path.
+// @hagicode/steamworks.js package installed globally (`npm i -g @hagicode/steamworks.js@0.1.4`). Nothing is read from a fixed path.
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -84,9 +84,9 @@ function locateSteamworks() {
   } catch {
     // npm not on PATH: fall through to the message below
   }
-  const folder = globalRoot ? path.join(globalRoot, '@ducky7go', 'steamworks.js') : '';
+  const folder = globalRoot ? path.join(globalRoot, '@hagicode', 'steamworks.js') : '';
   if (folder && existsSync(path.join(folder, 'index.js'))) return folder;
-  fail('steamworks.js not found: install it with `npm i -g @ducky7go/steamworks.js@0.1.4`, or set STEAMWORKS_JS to its package folder');
+  fail('steamworks.js not found: install it with `npm i -g @hagicode/steamworks.js@0.1.4`, or set STEAMWORKS_JS to its package folder');
 }
 const folder = locateSteamworks();
 const steamworks = createRequire(import.meta.url)(folder);
@@ -159,7 +159,7 @@ if (command === 'info') {
   // Screenshot upload is in steamworks.js 0.1.4 and later (UgcUpdate.additionalPreviewPaths).
   const [major, minor, patch] = steamworksVersion.split('-')[0].split('.').map(Number);
   if (major === 0 && (minor < 1 || (minor === 1 && patch < 4))) {
-    fail(`steamworks.js ${steamworksVersion} cannot add screenshots; install @ducky7go/steamworks.js@0.1.4 or later`);
+    fail(`steamworks.js ${steamworksVersion} cannot add screenshots; install @hagicode/steamworks.js@0.1.4 or later`);
   }
   const files = JSON.parse(readFileSync(need('files'), 'utf8'));
   if (!Array.isArray(files) || files.length === 0 || files.some((f) => typeof f !== 'string' || !path.isAbsolute(f))) {
@@ -197,7 +197,7 @@ if (command === 'info') {
   // Removing screenshots is in steamworks.js 0.1.5 and later (UgcUpdate.removeAdditionalPreviewIndexes).
   const [major, minor, patch] = steamworksVersion.split('-')[0].split('.').map(Number);
   if (major === 0 && (minor < 1 || (minor === 1 && patch < 5))) {
-    fail(`steamworks.js ${steamworksVersion} cannot remove screenshots; install @ducky7go/steamworks.js@0.1.5 or later`);
+    fail(`steamworks.js ${steamworksVersion} cannot remove screenshots; install @hagicode/steamworks.js@0.1.5 or later`);
   }
   const indexes = JSON.parse(readFileSync(need('indexes'), 'utf8'));
   if (!Array.isArray(indexes) || indexes.length === 0 || indexes.some((i) => !Number.isInteger(i) || i < 0)) {

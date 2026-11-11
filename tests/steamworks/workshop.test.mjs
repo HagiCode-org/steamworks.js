@@ -76,7 +76,7 @@ function fixture() {
   const fakeDir = path.join(base, 'steamworks.js');
   fs.mkdirSync(fakeDir);
   fs.writeFileSync(path.join(fakeDir, 'index.js'), FAKE_STEAMWORKS);
-  fs.writeFileSync(path.join(fakeDir, 'package.json'), JSON.stringify({ name: '@ducky7go/steamworks.js', version: '0.1.4' }));
+  fs.writeFileSync(path.join(fakeDir, 'package.json'), JSON.stringify({ name: '@hagicode/steamworks.js', version: '0.1.4' }));
   const item = path.join(base, 'MyMod');
   fs.mkdirSync(path.join(item, 'build'), { recursive: true });
   fs.writeFileSync(path.join(item, 'build', 'manifest.xml'), '<Manifest />\n');
@@ -299,7 +299,7 @@ test('upload fails clearly when steamworks.js is neither configured nor installe
   delete env.STEAMWORKS_JS;
   const r = spawnSync('python3', [WORKSHOP, 'upload', f.item, '--yes'], { encoding: 'utf8', env });
   assert.equal(r.status, 1);
-  assert.match(r.stdout + r.stderr, /npm i -g @ducky7go\/steamworks\.js@0\.1\.4/);
+  assert.match(r.stdout + r.stderr, /npm i -g @hagicode\/steamworks\.js@0\.1\.4/);
   assert.equal(readMeta(f).publishedFileId, '0');
   assert.equal(calls(f).length, 0);
 });
@@ -513,7 +513,7 @@ function screenshotFixture(f, version = '0.1.5') {
   fs.writeFileSync(f.state, JSON.stringify({
     previews: ['shot1.png', 'shot2.png', 'shot3.png'].map((n) => ({ originalFilename: n, urlOrVideoId: 'https://steam.example/' + n, previewType: 0 })),
   }));
-  fs.writeFileSync(path.join(f.fakeDir, 'package.json'), JSON.stringify({ name: '@ducky7go/steamworks.js', version }));
+  fs.writeFileSync(path.join(f.fakeDir, 'package.json'), JSON.stringify({ name: '@hagicode/steamworks.js', version }));
 }
 const remainingOnSteam = (f) => JSON.parse(fs.readFileSync(f.state, 'utf8')).previews.map((p) => p.originalFilename);
 
@@ -574,7 +574,7 @@ test('images remove is refused by a steamworks.js build older than 0.1.5', { ski
   screenshotFixture(f, '0.1.4');
   const r = run(['images', 'remove', f.item, 'shot2.png', '--yes'], {}, f);
   assert.equal(r.code, 1);
-  assert.match(r.err, /cannot remove screenshots; install @ducky7go\/steamworks\.js@0\.1\.5/);
+  assert.match(r.err, /cannot remove screenshots; install @hagicode\/steamworks\.js@0\.1\.5/);
   assert.equal(updates(f).length, 0);
   assert.equal(readMeta(f).screenshots.length, 3, 'workshop.json is unchanged');
 });

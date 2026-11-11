@@ -30,7 +30,7 @@ Tags are per game and never chosen by this skill. workshop.json must name them i
 (workshop_tags.py). `tags <item-dir>` prints that list.
 
 Standard library only; the Steam calls run in steam-workshop.mjs with Node.js. steamworks.js comes from STEAMWORKS_JS (a
-package folder) or the global install of @ducky7go/steamworks.js 0.1.4 or later (0.1.5 or later to remove screenshots).
+package folder) or the global install of @hagicode/steamworks.js 0.1.4 or later (0.1.5 or later to remove screenshots).
 """
 from __future__ import annotations
 
