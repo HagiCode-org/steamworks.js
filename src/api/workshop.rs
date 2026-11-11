@@ -197,6 +197,106 @@ pub mod workshop {
         update_details: UgcUpdate,
         app_id: Option<u32>,
     ) -> Result<UgcResult, Error> {
+        submit_item_update(item_id, update_details, app_id).await
+    }
+
+    /// Replace only the main preview image of a Workshop item.
+    ///
+    /// The mod content is not sent: nothing is uploaded from a content folder, and the title,
+    /// description, tags and visibility stay as they are.
+    ///
+    /// @param itemId - the Workshop item to update
+    /// @param previewPath - absolute path of an existing image file
+    /// @param appId - defaults to the app id the client was initialized with
+    /// @param changeNote - optional change note shown in the item's change history
+    #[napi]
+    pub async fn update_item_preview(
+        item_id: BigInt,
+        preview_path: String,
+        app_id: Option<u32>,
+        change_note: Option<String>,
+    ) -> Result<UgcResult, Error> {
+        let metadata = std::fs::metadata(&preview_path).map_err(|e| {
+            Error::from_reason(format!(
+                "the Workshop preview file `{preview_path}` cannot be read: {e}"
+            ))
+        })?;
+        if !metadata.is_file() {
+            return Err(Error::from_reason(format!(
+                "the Workshop preview path `{preview_path}` is not a file"
+            )));
+        }
+
+        submit_item_update(
+            item_id,
+            UgcUpdate {
+                title: None,
+                description: None,
+                change_note,
+                preview_path: Some(preview_path),
+                additional_preview_paths: None,
+                remove_additional_preview_indexes: None,
+                content_path: None,
+                tags: None,
+                visibility: None,
+                language: None,
+            },
+            app_id,
+        )
+        .await
+    }
+
+    /// Upload only the content folder of a Workshop item.
+    ///
+    /// The preview image is not touched, and the title, description, tags and visibility stay as
+    /// they are.
+    ///
+    /// @param itemId - the Workshop item to update
+    /// @param contentPath - absolute path of an existing folder with the mod files
+    /// @param appId - defaults to the app id the client was initialized with
+    /// @param changeNote - optional change note shown in the item's change history
+    #[napi]
+    pub async fn update_item_content(
+        item_id: BigInt,
+        content_path: String,
+        app_id: Option<u32>,
+        change_note: Option<String>,
+    ) -> Result<UgcResult, Error> {
+        let metadata = std::fs::metadata(&content_path).map_err(|e| {
+            Error::from_reason(format!(
+                "the Workshop content folder `{content_path}` cannot be read: {e}"
+            ))
+        })?;
+        if !metadata.is_dir() {
+            return Err(Error::from_reason(format!(
+                "the Workshop content path `{content_path}` is not a folder"
+            )));
+        }
+
+        submit_item_update(
+            item_id,
+            UgcUpdate {
+                title: None,
+                description: None,
+                change_note,
+                preview_path: None,
+                additional_preview_paths: None,
+                remove_additional_preview_indexes: None,
+                content_path: Some(content_path),
+                tags: None,
+                visibility: None,
+                language: None,
+            },
+            app_id,
+        )
+        .await
+    }
+
+    async fn submit_item_update(
+        item_id: BigInt,
+        update_details: UgcUpdate,
+        app_id: Option<u32>,
+    ) -> Result<UgcResult, Error> {
         let client = crate::client::get_client();
 
         let app_id = app_id

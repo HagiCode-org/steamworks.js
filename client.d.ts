@@ -928,6 +928,30 @@ export declare namespace workshop {
   }
   export function createItem(appId?: number | undefined | null): Promise<UgcResult>
   export function updateItem(itemId: bigint, updateDetails: UgcUpdate, appId?: number | undefined | null): Promise<UgcResult>
+  /**
+   * Replace only the main preview image of a Workshop item.
+   *
+   * The mod content is not sent: nothing is uploaded from a content folder, and the title,
+   * description, tags and visibility stay as they are.
+   *
+   * @param itemId - the Workshop item to update
+   * @param previewPath - absolute path of an existing image file
+   * @param appId - defaults to the app id the client was initialized with
+   * @param changeNote - optional change note shown in the item's change history
+   */
+  export function updateItemPreview(itemId: bigint, previewPath: string, appId?: number | undefined | null, changeNote?: string | undefined | null): Promise<UgcResult>
+  /**
+   * Upload only the content folder of a Workshop item.
+   *
+   * The preview image is not touched, and the title, description, tags and visibility stay as
+   * they are.
+   *
+   * @param itemId - the Workshop item to update
+   * @param contentPath - absolute path of an existing folder with the mod files
+   * @param appId - defaults to the app id the client was initialized with
+   * @param changeNote - optional change note shown in the item's change history
+   */
+  export function updateItemContent(itemId: bigint, contentPath: string, appId?: number | undefined | null, changeNote?: string | undefined | null): Promise<UgcResult>
   export function updateItemWithCallback(itemId: bigint, updateDetails: UgcUpdate, appId: number | undefined | null, successCallback: (data: UgcResult) => void, errorCallback: (err: any) => void, progressCallback?: (data: UpdateProgress) => void, progressCallbackIntervalMs?: number | undefined | null): void
   /**
    * Subscribe to a workshop item. It will be downloaded and installed as soon as possible.

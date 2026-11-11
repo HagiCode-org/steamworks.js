@@ -2,6 +2,8 @@
 // the package entry point exposes the functions its typings declare. The Steam calls themselves need a running client
 // (see the other scripts in this directory).
 const assert = require('node:assert/strict')
+const os = require('node:os')
+const path = require('node:path')
 const steamworks = require('../index.js')
 
 assert.equal(typeof steamworks.init, 'function', 'init is exported')
@@ -21,6 +23,8 @@ const nativeBinding = require(bindingPaths[`${process.platform}-${process.arch}`
 
 assert.equal(typeof nativeBinding.workshop.addDependency, 'function', 'workshop.addDependency is exported')
 assert.equal(typeof nativeBinding.workshop.removeDependency, 'function', 'workshop.removeDependency is exported')
+assert.equal(typeof nativeBinding.workshop.updateItemPreview, 'function', 'workshop.updateItemPreview is exported')
+assert.equal(typeof nativeBinding.workshop.updateItemContent, 'function', 'workshop.updateItemContent is exported')
 
 // friends namespace: every function is exported without a running Steam client.
 for (const name of [
@@ -177,4 +181,15 @@ for (const [namespace, name] of [
     assert.equal(typeof nativeBinding[namespace][name], 'function', `${namespace}.${name} is exported`)
 }
 
-console.log('offline smoke test passed (workshop, friends, stats, achievement, leaderboard, callback, networking, matchmaking servers, screenshots, timeline, remote play and supplemental exports are present)')
+// updateItemPreview and updateItemContent check their path before any Steam call, so a bad path rejects offline.
+async function checkWorkshopPathValidation() {
+    const missing = path.join(os.tmpdir(), 'steamworksjs-no-such-path')
+    await assert.rejects(nativeBinding.workshop.updateItemPreview(1n, missing), /cannot be read/, 'a missing preview file rejects')
+    await assert.rejects(nativeBinding.workshop.updateItemPreview(1n, os.tmpdir()), /is not a file/, 'a folder is not a preview file')
+    await assert.rejects(nativeBinding.workshop.updateItemContent(1n, missing), /cannot be read/, 'a missing content folder rejects')
+    await assert.rejects(nativeBinding.workshop.updateItemContent(1n, __filename), /is not a folder/, 'a file is not a content folder')
+}
+
+checkWorkshopPathValidation().then(() => {
+    console.log('offline smoke test passed (workshop, friends, stats, achievement, leaderboard, callback, networking, matchmaking servers, screenshots, timeline, remote play and supplemental exports are present)')
+})

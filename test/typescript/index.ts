@@ -17,6 +17,19 @@ export async function requireThenRemove(parentId: bigint, childId: bigint): Prom
 	return added === 1 && removed === 1 ? 1 : 0;
 }
 
+// Replaces only the main preview, or uploads only the content folder; each resolves with the item id
+export async function replacePreviewOnly(itemId: bigint, previewPath: string): Promise<bigint> {
+	const client = steamworks.init(480);
+	const result: workshop.UgcResult = await client.workshop.updateItemPreview(itemId, previewPath, undefined, "New preview");
+	return result.itemId;
+}
+
+export async function uploadContentOnly(itemId: bigint, contentDir: string): Promise<boolean> {
+	const client = steamworks.init(480);
+	const result: workshop.UgcResult = await client.workshop.updateItemContent(itemId, contentDir);
+	return result.needsToAcceptAgreement;
+}
+
 // Example of using the friends namespace: lists friends who are online and not in a game
 export async function listOnlineFriends(): Promise<string[]> {
 	const client = steamworks.init(480);
