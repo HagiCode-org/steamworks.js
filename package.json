@@ -1,5 +1,5 @@
 {
-	"name": "@ducky7go/steamworks.js",
+	"name": "@hagicode/steamworks.js",
 	"description": "Node.js and Electron bindings for the Steamworks SDK: Steam Workshop, achievements, stats, cloud, overlay, networking.",
 	"keywords": [
 		"steam",
@@ -10,9 +10,9 @@
 		"napi",
 		"electron"
 	],
-	"homepage": "https://github.com/ducky7go/steamworks.js#readme",
+	"homepage": "https://github.com/HagiCode-org/steamworks.js#readme",
 	"bugs": {
-		"url": "https://github.com/ducky7go/steamworks.js/issues"
+		"url": "https://github.com/HagiCode-org/steamworks.js/issues"
 	},
 	"version": "0.0.1",
 	"main": "index.js",
@@ -58,7 +58,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/ducky7go/steamworks.js"
+		"url": "https://github.com/HagiCode-org/steamworks.js"
 	},
 	"publishConfig": {
 		"access": "public"
