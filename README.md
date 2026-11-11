@@ -266,6 +266,188 @@ Steam supports the following language codes:
 
 **Note**: If `language` is omitted, it defaults to `"english"`.
 
+## Friends
+
+The `friends` namespace reads the local user's friend list, friend state and avatars, and sends game invites. SteamIDs are `bigint` values.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// 0x4 = immediate friends (FriendFlags.IMMEDIATE)
+for (const friend of client.friends.getFriends(0x4)) {
+  const state = client.friends.getFriendState(friend.steamId64)
+  const avatar = client.friends.getMediumAvatar(friend.steamId64) // Buffer of RGBA pixels, or null
+  console.log(friend.nickName ?? friend.name, state, avatar?.length ?? 0)
+}
+
+// Invite a friend to the current game with a connect string
+client.friends.inviteUserToGame(friendSteamId, 'lobby=abc')
+
+// Remove the Rich Presence keys set with localplayer.setRichPresence
+client.friends.clearRichPresence()
+```
+
+- `getFriendState` returns a `FriendState` value; `getFriendGamePlayed` returns the AppID of the game a friend is playing, or `null`.
+- Avatars are `null` until Steam has loaded them. Call `client.friends.requestUserInformation(steamId64, true)` to ask for a user's information, and wait for the `PersonaStateChange` callback before reading it again.
+- Name and state updates arrive through `runCallbacks()`, which `init()` already calls on a timer.
+
+## Stats, Achievements and Leaderboards
+
+`stats` gains float stats, the achievement count and a request for another user's stats. `achievement` gains global unlock percentages. The `leaderboard` namespace finds and creates leaderboards, uploads scores and downloads entries.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+client.stats.setFloat('distance', 12.5)
+console.log(client.stats.getFloat('distance')) // 12.5, or null when the stat is not defined
+console.log(client.stats.getNumAchievements())
+
+// Global unlock percentages: call the request first, then read each achievement
+await client.achievement.requestGlobalPercentages()
+console.log(client.achievement.getAchievedPercent('FIRST_RUN')) // 0 to 100, or null
+
+// Leaderboards: 0 = Ascending, 0 = Numeric; upload with 0 = KeepBest, download with 0 = Global
+const board = await client.leaderboard.findOrCreate('Fastest', 0, 0)
+if (board) {
+  const result = await board.uploadScore(0, 1234, [])   // null when Steam did not accept the upload
+  const top = await board.downloadEntries(0, 0, 10, 0)  // ranks 0 to 9
+  console.log(board.getName(), board.getEntryCount(), result, top)
+}
+```
+
+- `requestUserStats(steamId64)` only starts the request. Its result arrives through the `UserStatsReceived` callback (see `callback.register`).
+- The Promise-returning functions (`requestGlobalPercentages`, `find`, `findOrCreate`, `uploadScore`, `downloadEntries`) resolve when Steam answers. Steam delivers those answers inside `runCallbacks()`. `init()` runs it about 30 times a second, so you do not need to call it yourself while the client is initialized.
+- A Promise rejects with a readable message when Steam reports a failure. When the answer is lost, the message says the outcome is unknown, so check the data before retrying an upload.
+
+## Networking: `networking` and the New Namespaces
+
+Two families of networking APIs coexist. The `networking` namespace is the original P2P packet API (`sendP2PPacket`, `readP2PPacket`, `acceptP2PSession`), and it is unchanged. The new `networkingSockets`, `networkingMessages` and `networkingUtils` namespaces wrap Steam's Networking Sockets, Networking Messages and Networking Utils interfaces.
+
+- `networking` sends unreliable or reliable packets to a SteamID and reads them back in arrival order. There is no connection object, so you cannot close one peer or tell when it dropped.
+- `networkingSockets` creates listen sockets and connections (by IP address or by SteamID), sends and receives messages with send flags, and groups connections into poll groups. Connections are objects with `close`, and state queries show whether each one is open.
+- `networkingMessages` is connectionless, like UDP: send to a SteamID on a channel, receive by channel, and handle session requests and failures. Steam creates the underlying session implicitly.
+- `networkingUtils` starts relay network access and reports its availability.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// Relay access and authentication: start them early if you expect relayed or authenticated connections
+client.networkingUtils.initRelayNetworkAccess()
+console.log(client.networkingUtils.getRelayNetworkStatus()) // NetworkingAvailability value
+client.networkingSockets.initAuthentication()
+
+// Host: poll the listen socket without waiting, accept connecting peers and take the connection when it is connected
+const listen = client.networkingSockets.createListenSocketIp('0.0.0.0:27015')
+const event = listen.tryReceiveEvent() // null when nothing is pending
+if (event && event.kind === 0 /* Connecting */) {
+  event.accept()
+}
+if (event && event.kind === 1 /* Connected */) {
+  const connection = event.takeConnection()
+  connection.send(Buffer.from('hello'), 8) // 8 = reliable
+  console.log(connection.receive(16))
+}
+
+// Client: connect by IP address, then close with a reason
+const connection = client.networkingSockets.connectByIpAddress('203.0.113.5:27015')
+connection.setUserData(1n)
+connection.close(1000, 'done', true)
+
+// Messages: accept requests from Steam users and read channel 3
+client.networkingMessages.onSessionRequest((request) => request.accept())
+client.networkingMessages.sendMessageToUser(friendSteamId, 8, Buffer.from('hi'), 3)
+console.log(client.networkingMessages.receiveMessagesOnChannel(3, 10))
+```
+
+- Send flags are a bitmask of Steam's `k_nSteamNetworkingSend_*` values: `0` unreliable, `8` reliable, `1` no Nagle delay. Invalid addresses and closed handles fail with a readable error.
+- Listen socket events and session requests are only produced while `runCallbacks()` runs. `init()` already calls it about 30 times a second.
+- A connection or request you never close or answer is closed or rejected when its JavaScript object is garbage collected. Close connections explicitly.
+- Connections and messages need a Steam network path, so they cannot be exercised offline. The offline smoke test only checks that these functions are exported.
+
+## Server Browser, Timeline, Screenshots and Remote Play
+
+`matchmakingServers` lists game servers and queries single servers. `timeline` marks game state and events for Steam's timeline. `screenshots` hooks the screenshot hotkey and adds images to the Steam library. `remotePlay` lists Remote Play Together sessions and sends invites.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// Server list: request, read, then release it
+const list = client.matchmakingServers.lanServerList(appId)
+try {
+  for (let i = 0; i < list.getServerCount(); i++) {
+    const server = list.getServerDetails(i) // ip, port, name, map, players, maxPlayers, ping
+    console.log(server.name, server.players, server.maxPlayers, server.ping)
+  }
+} finally {
+  list.release()
+}
+
+// Single server: these are Promises and reject when the server does not answer
+const ping = await client.matchmakingServers.pingServer('192.168.1.10', 27015)
+const players = await client.matchmakingServers.playerDetails('192.168.1.10', 27015)
+const rules = await client.matchmakingServers.serverRules('192.168.1.10', 27015)
+
+// Timeline: 0 = Playing (the game mode values are Playing, Staging, Menus, LoadingScreen)
+client.timeline.setGameMode(0)
+client.timeline.addEvent('icon', 'Boss defeated', '', 0, -5, 5, 1) // clip priority 1 = Standard
+
+// Screenshots: with the hook on, the hotkey raises ScreenshotRequested instead of Steam taking the picture
+client.screenshots.hookScreenshots(true)
+client.screenshots.triggerScreenshot()
+
+// Remote Play Together
+for (const session of client.remotePlay.sessions()) {
+  console.log(session.sessionId, session.steamId64, client.remotePlay.sessionDetails(session.sessionId))
+}
+client.remotePlay.invite(friendSteamId)
+```
+
+- Steam fills a server list over time, through callbacks that `init()` pumps automatically. Read the count after a short wait, not right after the request. The single-server functions are Promises that resolve the same way.
+- Release every server list request when you finish with it. Methods called after `release()` throw a readable error.
+- Invalid IPv4 addresses, negative durations and strings with NUL characters are rejected with a readable error before any Steam call.
+- `timeline` calls are silent when the Steam timeline interface is unavailable.
+
+## Supplemental Functions
+
+These functions extend existing namespaces. Nothing that existed before has changed.
+
+```js
+const client = steamworks.init(appId)
+
+// apps: the launch command line, and a query parameter from a Steam link such as steam://run/480//mode=demo
+client.apps.launchCommandLine()
+client.apps.launchQueryParam('mode') // '' when the parameter is absent
+
+// utils: overlay and UI state
+client.utils.isOverlayEnabled()
+client.utils.isSteamInBigPictureMode()
+client.utils.getUiLanguage() // for example 'english'
+
+// input: digital and analog action data, and the origins bound to an action
+const pressed = client.input.getDigitalActionData(controllerHandle, actionHandle).state
+const stick = client.input.getAnalogActionData(controllerHandle, analogHandle) // { x, y, active }
+const origins = client.input.getDigitalActionOrigins(controllerHandle, actionSetHandle, actionHandle)
+const label = client.input.getStringForActionOrigin(origins[0] ?? 0)
+
+// networking: P2P packets on a channel, and closing a session
+client.networking.sendP2PPacketOnChannel(friendSteamId, SendType.Reliable, Buffer.from('hi'), 2)
+client.networking.isP2PPacketAvailableOnChannel(2)
+client.networking.closeP2PSession(friendSteamId)
+
+// cloud: share a file (a Promise), stop syncing it, and choose the platforms it syncs to
+const shareHandle = await client.cloud.shareFile('save.json')
+client.cloud.forgetFile('save.json')
+client.cloud.setSyncPlatforms('save.json', 0 /* SyncPlatform.None */)
+```
+
+- `getStringForActionOrigin` and `getGlyphForActionOrigin` return an empty string for an origin number that Steam does not define.
+- `getSyncPlatforms` rejects when a file syncs to a combination of platforms, because a single `SyncPlatform` value cannot describe it.
+- `shareFile` resolves once Steam answers, which happens through `runCallbacks()`. `init()` runs it for you.
+
 ## Release Process
 
 This project uses automated release management:
