@@ -307,7 +307,7 @@ test('upload fails clearly when steamworks.js is neither configured nor installe
 test('the shipped skill has no project data and no hard-coded user paths', () => {
   for (const file of ['scripts/workshop.py', 'scripts/steam-workshop.mjs', 'SKILL.md', 'references/item-layout.md']) {
     const text = fs.readFileSync(path.join(PUBLISH, file), 'utf8');
-    assert.doesNotMatch(text, /\/home\/newbe36524|Stonlen|Probably Stolen|ducky-cli/i, `${file} must stay generic`);
+    assert.doesNotMatch(text, /\/home\/[^/\s'"]+\/|Stonlen|Probably Stolen|ducky-cli/i, `${file} must stay generic`);
   }
 });
 

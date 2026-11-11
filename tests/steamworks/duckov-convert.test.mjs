@@ -14,7 +14,7 @@ function makeMod(descriptions) {
   const root = mkdtempSync(path.join(tmpdir(), 'duckov-convert-'));
   const mod = path.join(root, 'Mod');
   mkdirSync(path.join(mod, 'assets', 'description'), { recursive: true });
-  writeFileSync(path.join(mod, 'assets', 'info.ini'), 'name = Mod\npublishedFileId = 3626449899\nversion = 0.1.0\n');
+  writeFileSync(path.join(mod, 'assets', 'info.ini'), 'name = Mod\npublishedFileId = 3900000002\nversion = 0.1.0\n');
   writeFileSync(path.join(mod, 'assets', 'preview.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
   for (const [lang, md] of Object.entries(descriptions)) writeFileSync(path.join(mod, 'assets', 'description', `${lang}.md`), md);
   const content = path.join(root, 'build', 'Mod');
@@ -30,7 +30,7 @@ test('converter writes workshop/ with the existing publishedFileId, BBCode and t
   });
   py([path.join(scripts, 'duckov-to-workshop.py'), mod, '--content', content]);
   const config = JSON.parse(readFileSync(path.join(mod, 'workshop', 'workshop.json'), 'utf8'));
-  assert.equal(config.publishedFileId, '3626449899');
+  assert.equal(config.publishedFileId, '3900000002');
   assert.equal(config.primaryLanguage, 'english');
   assert.equal(config.languages.english.title, 'Warm Dog');
   assert.equal(config.languages.schinese.title, '暖狗');
@@ -48,7 +48,7 @@ test('converter keeps only en and zh, skips other locales with a skip line, and 
   assert.match(out, /^skip: ja \(not en or zh-CN; not uploaded\)$/m);
   const config = JSON.parse(readFileSync(path.join(mod, 'workshop', 'workshop.json'), 'utf8'));
   assert.deepEqual(Object.keys(config.languages).sort(), ['english', 'schinese']);
-  assert.equal(config.publishedFileId, '3626449899');
+  assert.equal(config.publishedFileId, '3900000002');
   assert.equal(existsSync(path.join(mod, 'workshop', 'description.ja.txt')), false, 'a skipped locale writes no file');
 });
 
