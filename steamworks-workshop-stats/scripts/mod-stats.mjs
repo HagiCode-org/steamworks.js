@@ -12,7 +12,7 @@
 // The cache is the only history: clearing the cache directory deletes the comparison base.
 //
 // steamworks.js is found like steam-workshop.mjs: STEAMWORKS_JS (a package folder with index.js), else the global
-// @ducky7go/steamworks.js install. The Steam client must be running and logged in to the publishing account.
+// @hagicode/steamworks.js install. The Steam client must be running and logged in to the publishing account.
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -220,10 +220,10 @@ function loadSteamworks() {
     } catch {
       // npm not on PATH: reported below
     }
-    folder = root ? path.join(root, '@ducky7go', 'steamworks.js') : '';
+    folder = root ? path.join(root, '@hagicode', 'steamworks.js') : '';
   }
   if (!folder || !existsSync(path.join(folder, 'index.js'))) {
-    throw new Error('steamworks.js not found: npm i -g @ducky7go/steamworks.js@0.1.4, or set STEAMWORKS_JS');
+    throw new Error('steamworks.js not found: npm i -g @hagicode/steamworks.js@0.1.4, or set STEAMWORKS_JS');
   }
   return createRequire(import.meta.url)(folder);
 }
