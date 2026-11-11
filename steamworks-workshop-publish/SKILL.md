@@ -103,7 +103,7 @@ Screenshots: `images list` first (read-only) to see what Steam has. `images uplo
 
 ## Videos
 
-Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@ducky7go/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video (the demo-video skill's `references/mod-video.md` in `repos/video-go/demo-video/`), upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
+Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@ducky7go/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video (a separate demo-video skill's `references/mod-video.md`, which is not part of this repository), upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
 
 ```json
 "videos": [ { "youtubeId": "dQw4w9WgXcQ", "title": "Demo (English)" } ]
