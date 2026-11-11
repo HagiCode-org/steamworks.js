@@ -15,6 +15,23 @@
 - Type declarations: `client.d.ts` is generated and tracked in git. `index.d.ts` and `callbacks.d.ts` are hand-written.
 - `scripts/check-package.js`: the `prepack` guard. It fails if a platform's native module or the Steam redistributable is missing, or if `package.json` still has `0.0.1`.
 - `test/`: Node smoke scripts (`offline-smoke-test.js`, `auth.js`, `workshop.js`, ...), `test/electron/` app, `test/typescript/` type-check project.
+- Agent skills (Steam Workshop workflows): one top-level folder per skill, each with `SKILL.md` plus `scripts/`, `references/` and `templates/` where needed. Folders: `steamworks-js/` (router), `steamworks-workshop-publish/`, `steamworks-workshop-update/`, `steamworks-workshop-query/`, `steamworks-workshop-client-state/`, `steamworks-workshop-stats/`. The layout follows `my_ansible/machines/`.
+- Skill tests stay outside the skill folders, in `tests/steamworks/`. This is not the same as `test/` above.
+
+## Skills
+
+- Skill index:
+  - [`steamworks-js`](steamworks-js/SKILL.md): router for the steamworks.js binding (setup, client init, AppID, callbacks, sub-skill choice).
+  - [`steamworks-workshop-query`](steamworks-workshop-query/SKILL.md): read-only Workshop queries.
+  - [`steamworks-workshop-publish`](steamworks-workshop-publish/SKILL.md): publish new items; submits remote content.
+  - [`steamworks-workshop-update`](steamworks-workshop-update/SKILL.md): update existing items; submits remote content.
+  - [`steamworks-workshop-client-state`](steamworks-workshop-client-state/SKILL.md): subscriptions, downloads, install info; changes account or local state.
+  - [`steamworks-workshop-stats`](steamworks-workshop-stats/SKILL.md): read-only subscriber and favorite report with daily cache.
+- Run the skill tests from the repo root: `node --test tests/steamworks/*.test.mjs`. The publish scripts call `python3`, so it must be on `PATH`.
+- Each `SKILL.md` frontmatter `name` must equal its folder name, and `steamworks-js/SKILL.md` must link to every sub-skill. `tests/steamworks/skill.test.mjs` checks both.
+- The skills are not part of the npm package. `package.json` `files` lists only `dist/*`, `index.js`, `*.d.ts` and `README.md`; keep it that way. Check with `npm pack --dry-run --ignore-scripts`.
+- Other projects use a skill by symlinking its folder into their own `.claude/skills/`, as `my_ansible` describes for `machines/`.
+- Settings that must not be committed stay out of the repo. The scripts read `STEAMWORKS_JS`, `WORKSHOP_TAGS_FILE` and `XDG_CACHE_HOME` from the environment.
 
 ## Build, test, format
 
