@@ -5,7 +5,7 @@ description: "Steam Workshop statistics report for each mod this Steam account p
 
 # steamworks-workshop-stats
 
-**Impact: Read-only for Steam.** The script calls only read methods (`getUserItems`, `getSteamId`, `isSubscribedApp`) and never changes the Workshop or the account. It writes one thing: the day's counts, to the current user's cache directory (see below). Complete the setup in [`steamworks-js`](../steamworks-js/SKILL.md) first: Node, `@ducky7go/steamworks.js` installed globally (or `STEAMWORKS_JS`), and the Steam client running and logged in to the publishing account.
+**Impact: Read-only for Steam.** The script calls only read methods (`getUserItems`, `getSteamId`, `isSubscribedApp`) and never changes the Workshop or the account. It writes one thing: the day's counts, to the current user's cache directory (see below). Complete the setup in [`steamworks-js`](../steamworks-js/SKILL.md) first: Node, `@hagicode/steamworks.js` installed globally (or `STEAMWORKS_JS`), and the Steam client running and logged in to the publishing account.
 
 ## Run
 

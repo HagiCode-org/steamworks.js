@@ -2,14 +2,14 @@
 
 ## Overview
 
-- `@ducky7go/steamworks.js`: Node/Electron bindings for the Steamworks SDK. A Rust native layer (`napi` 2.16 + `napi-derive`, crate `steamworksjs`, `cdylib`) wraps `steamworks-rs`, with a thin JS loader (`index.js`) and hand-maintained type declarations.
+- `@hagicode/steamworks.js`: Node/Electron bindings for the Steamworks SDK. A Rust native layer (`napi` 2.16 + `napi-derive`, crate `steamworksjs`, `cdylib`) wraps `steamworks-rs`, with a thin JS loader (`index.js`) and hand-maintained type declarations.
 - `package.json` is committed with `"version": "0.0.1"`. CI sets the real version with `npm version` before building and publishing; do not bump it for a release.
 - The README presents this as a replacement for greenworks. The upstream repo was not verified: no `upstream` remote is configured in this checkout.
 
 ## Layout
 
 - `src/lib.rs`, `src/client.rs`, `src/api/*.rs`: one Rust module per Steam feature (`achievement`, `apps`, `auth`, `callback`, `cloud`, `input`, `localplayer`, `matchmaking`, `networking`, `overlay`, `stats`, `utils`, `workshop`, `workshop_item`).
-- `vendor/steamworks-rs`: git submodule (`https://github.com/ducky7go/steamworks-rs.git`), a path dependency with features `serde` and `raw-bindings`. Do not edit it. In a non-recursive clone it is empty; run `git submodule update --init --recursive` before building.
+- `vendor/steamworks-rs`: git submodule (`https://github.com/HagiCode-org/steamworks-rs.git`), a path dependency with features `serde` and `raw-bindings`. Do not edit it. In a non-recursive clone it is empty; run `git submodule update --init --recursive` before building.
 - `build.js`: copies the Steam redistributable from `vendor/steamworks-rs/steamworks-sys/lib/steam/redistributable_bin/<folder>` into `dist/<folder>`, then runs `napi build` for the chosen target. It passes `--dts ../../client.d.ts`, so the build regenerates `client.d.ts`.
 - `index.js` loads `dist/<win64|linux64|osx>/steamworksjs.<triple>.node`. Supported: win32-x64, linux-x64, darwin-x64, darwin-arm64.
 - Type declarations: `client.d.ts` is generated and tracked in git. `index.d.ts` and `callbacks.d.ts` are hand-written.
@@ -46,19 +46,20 @@
 
 Publishing is done by `.github/workflows/publish.yml`. Version rules come from the tag or from `GitVersion.yml`.
 
-- Official release: push a `v*` tag, for example `git tag v0.5.0 && git push origin v0.5.0`. CI strips the `v` and publishes that version to the npm `latest` dist-tag. Users install with `npm i @ducky7go/steamworks.js`.
-- Dev build: every push to `main` publishes GitVersion's `fullSemVer` to the npm `dev` dist-tag. Users install with `npm i @ducky7go/steamworks.js@dev`.
-- The dev version comes from GitVersion, not from the GitHub API. `GitVersion.yml` sets the `main` branch to label `dev` with a Patch increment, computed from the git tags. Pushes to other branches and pull requests build but do not publish; the deploy job runs only for pushes to `ducky7go/steamworks.js`.
+- Official release: publish the draft release that `release-draft-action.yml` keeps up to date (see below), or push a `v*` tag by hand, for example `git tag v0.5.0 && git push origin v0.5.0`. Either way the tag triggers `publish.yml`. CI strips the `v` and publishes that version to the npm `latest` dist-tag. Users install with `npm i @hagicode/steamworks.js`.
+- Dev build: every push to `main` publishes GitVersion's `fullSemVer` to the npm `dev` dist-tag. Users install with `npm i @hagicode/steamworks.js@dev`.
+- The dev version comes from GitVersion, not from the GitHub API. `GitVersion.yml` sets the `main` branch to label `dev` with a Patch increment, computed from the git tags. Pushes to other branches and pull requests build but do not publish; the deploy job runs only for pushes to `HagiCode-org/steamworks.js`.
 - GitVersion needs tags and full history. Every checkout in `publish.yml` uses `fetch-depth: 0` and `submodules: recursive`; keep both if you edit the workflow.
+- Release drafts: `.github/workflows/release-draft-action.yml` runs `HagiCode-org/hagi-release-drafter` (pinned to a tag) on every push to `main` and on manual dispatch (optional `version` input, stable `X.Y.Z` only). It creates or updates one draft release and never publishes it. The version comes from Conventional Commits since the last release tag (`feat` bumps minor, `!` or `BREAKING CHANGE:` bumps minor while major is 0, anything else bumps patch). Publishing the draft in the GitHub UI creates the `vX.Y.Z` tag, which triggers `publish.yml`. PR labels are not used. Keep `fetch-depth: 0` and `fetch-tags: true` on its checkout.
 - `publish.yml` fails if the committed `client.d.ts` differs from the native build. After changing the Rust API, rebuild and commit `client.d.ts`.
 
 ## Conventions
 
-- Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, ...). Mark breaking changes with `BREAKING CHANGE:` in the body (`CONTRIBUTING.md`). Release notes are generated from commit messages.
+- Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, ...). Mark breaking changes with `!` after the type or a `BREAKING CHANGE:` footer (`CONTRIBUTING.md`). Release notes are generated from commit messages by hagi-release-drafter; a commit subject containing `skip-release-notes` is left out.
 - Behavior or spec changes follow the OpenSpec workflow.
 - Update `client.d.ts` and `index.d.ts` together with the Rust API.
 - Workshop language codes are Steam API names (`english`, `schinese`, `french`, ...), passed as `language` to `updateItem` (see the README "Workshop Multilingual Support" section).
-- Changing the submodule pointer requires the matching commit to be pushed to `ducky7go/steamworks-rs` first.
+- Changing the submodule pointer requires the matching commit to be pushed to `HagiCode-org/steamworks-rs` first.
 
 ## Gotchas
 

@@ -55,9 +55,9 @@ python3 <skill>/steamworks-workshop-publish/scripts/workshop.py images remove <i
 python3 <skill>/steamworks-workshop-publish/scripts/workshop.py images remove <item-dir> <file-name>... --yes  # after the go-ahead
 ```
 
-Only the listed files that Steam does not have yet (matched by file name) are added, so a repeated run adds nothing new. Adding needs `@ducky7go/steamworks.js` 0.1.4 or later; the scripts refuse older builds.
+Only the listed files that Steam does not have yet (matched by file name) are added, so a repeated run adds nothing new. Adding needs `@hagicode/steamworks.js` 0.1.4 or later; the scripts refuse older builds.
 
-Removing needs `@ducky7go/steamworks.js` 0.1.5 or later. It is one update that names the screenshots by file name, and it changes no content or title. The file name must be on Steam now (`images list` shows them); the command stops on any other name. With `--yes`, the removed entries also leave `screenshots` in `workshop.json`, so the next `images upload` does not add them back. Steam offers no call here to reorder screenshots.
+Removing needs `@hagicode/steamworks.js` 0.1.5 or later. It is one update that names the screenshots by file name, and it changes no content or title. The file name must be on Steam now (`images list` shows them); the command stops on any other name. With `--yes`, the removed entries also leave `screenshots` in `workshop.json`, so the next `images upload` does not add them back. Steam offers no call here to reorder screenshots.
 
 ## Out of scope
 

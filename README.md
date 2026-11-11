@@ -1,5 +1,5 @@
-[![Build Status](https://github.com/ducky7go/steamworks.js/actions/workflows/publish.yml/badge.svg)](https://github.com/ducky7go/steamworks.js/actions/workflows/publish.yml)
-[![npm](https://img.shields.io/npm/v/@ducky7go/steamworks.js.svg)](https://npmjs.com/package/@ducky7go/steamworks.js)
+[![Build Status](https://github.com/HagiCode-org/steamworks.js/actions/workflows/publish.yml/badge.svg)](https://github.com/HagiCode-org/steamworks.js/actions/workflows/publish.yml)
+[![npm](https://img.shields.io/npm/v/@hagicode/steamworks.js.svg)](https://npmjs.com/package/@hagicode/steamworks.js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Steamworks.js
@@ -36,14 +36,14 @@ if (client.achievement.activate('ACHIEVEMENT')) {
 }
 ```
 
-You can refer to the [declarations file](https://github.com/ducky7go/steamworks.js/blob/main/client.d.ts) to check the API support and get more detailed documentation of each function.
+You can refer to the [declarations file](https://github.com/HagiCode-org/steamworks.js/blob/main/client.d.ts) to check the API support and get more detailed documentation of each function.
 
 ## Installation
 
 To use steamworks.js you don't have to build anything, just install it from npm:
 
 ```sh
-npm i @ducky7go/steamworks.js
+npm i @hagicode/steamworks.js
 ```
 
 ### Migration from `steamworks.js`
@@ -53,7 +53,7 @@ If you were using the unscoped `steamworks.js` package, update your `package.jso
 ```json
 {
   "dependencies": {
-    "@ducky7go/steamworks.js": "latest"
+    "@hagicode/steamworks.js": "latest"
   }
 }
 ```
@@ -81,7 +81,7 @@ To make the steam overlay working, call the `electronEnableSteamOverlay` on the 
 require('steamworks.js').electronEnableSteamOverlay()
 ```
 
-For the production build, copy the relevant distro files from `sdk/redistributable_bin/{YOUR_DISTRO}` into the root of your build. If you are using electron-forge, look for [#75](https://github.com/ducky7go/steamworks.js/issues/75).
+For the production build, copy the relevant distro files from `sdk/redistributable_bin/{YOUR_DISTRO}` into the root of your build. If you are using electron-forge, look for [#75](https://github.com/HagiCode-org/steamworks.js/issues/75).
 
 
 ## How to build
@@ -95,7 +95,7 @@ Make sure you have the latest [node.js](https://nodejs.org/en/), [Rust](https://
 This project uses git submodules for the steamworks-rs dependency. When cloning the repository, use:
 
 ```sh
-git clone --recurse-submodules https://github.com/ducky7go/steamworks.js.git
+git clone --recurse-submodules https://github.com/HagiCode-org/steamworks.js.git
 ```
 
 If you have already cloned the repository without submodules, initialize them with:
@@ -472,7 +472,8 @@ client.cloud.setSyncPlatforms('save.json', 0 /* SyncPlatform.None */)
 
 This project uses automated release management:
 
-- **Pre-releases**: Automatically created on each push to the `main` branch for testing
-- **Official releases**: Created when a version tag is pushed (e.g., `v1.2.3`)
+- **Dev builds**: Every push to the `main` branch publishes a build to the npm `dev` dist-tag for testing
+- **Release drafts**: Every push to `main` updates one draft GitHub release for the next `vX.Y.Z`, drafted by [hagi-release-drafter](https://github.com/HagiCode-org/hagi-release-drafter). It is never published automatically
+- **Official releases**: Publish the draft in the GitHub UI. That creates the `vX.Y.Z` tag, and the tag publishes the npm `latest` version
 
-Release notes are automatically generated from commit messages. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the commit message format.
+Release notes are automatically generated from Conventional Commit messages. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the commit message format.

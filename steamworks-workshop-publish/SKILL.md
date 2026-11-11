@@ -7,7 +7,7 @@ description: Publish a new Steam Workshop item or update one with steamworks.js,
 
 **Impact: submits remote content.** Nothing is sent to Steam unless `upload` gets `--yes`, and a submitted update cannot be cancelled. Before `--yes`, confirm with the user: the account, the AppID, the item (new, or which `publishedFileId`), the visibility, the files, and the preview.
 
-Complete the setup in [`steamworks-js`](../steamworks-js/SKILL.md) first: Node, `@ducky7go/steamworks.js` 0.1.4 or later installed globally (or `STEAMWORKS_JS`), a running logged-in Steam client, and an account that owns the app. Screenshot uploads need 0.1.4 or later, and removing screenshots needs 0.1.5 or later; the scripts refuse older builds.
+Complete the setup in [`steamworks-js`](../steamworks-js/SKILL.md) first: Node, `@hagicode/steamworks.js` 0.1.4 or later installed globally (or `STEAMWORKS_JS`), a running logged-in Steam client, and an account that owns the app. Screenshot uploads need 0.1.4 or later, and removing screenshots needs 0.1.5 or later; the scripts refuse older builds.
 
 ## Where the data lives
 
@@ -103,7 +103,7 @@ Screenshots: `images list` first (read-only) to see what Steam has. `images uplo
 
 ## Videos
 
-Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@ducky7go/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video (a separate demo-video skill's `references/mod-video.md`, which is not part of this repository), upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
+Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@hagicode/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video (a separate demo-video skill's `references/mod-video.md`, which is not part of this repository), upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
 
 ```json
 "videos": [ { "youtubeId": "dQw4w9WgXcQ", "title": "Demo (English)" } ]

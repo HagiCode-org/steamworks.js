@@ -4,7 +4,7 @@ Thank you for your interest in contributing to steamworks.js!
 
 ## Commit Conventions
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/) to automate release notes generation. Please format your commit messages according to these conventions:
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) to automate release notes generation through [hagi-release-drafter](https://github.com/HagiCode-org/hagi-release-drafter). A commit whose subject contains `skip-release-notes` is left out of the notes. Please format your commit messages according to these conventions:
 
 ### Commit Message Format
 
@@ -32,7 +32,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) t
 
 ### Breaking Changes
 
-For breaking API changes, add `BREAKING CHANGE:` to the commit body or add the `breaking-change` label to your pull request:
+For breaking API changes, put `!` after the type or scope (`feat!:`) or add a `BREAKING CHANGE:` footer to the commit body. Pull request labels are not used for release notes:
 
 ```
 feat: change client.init() return type

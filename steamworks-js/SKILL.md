@@ -10,7 +10,7 @@ This skill owns the shared setup for every `steamworks-*` skill. It does not car
 ## 1. Environment check (read-only)
 
 - Confirm the Node version the project uses (`node -v`) and that a `steamworks.js` package is in its dependencies. Read the installed typings (`client.d.ts`) before using any call; the surface differs between builds, so do not assume a function exists because another build has it.
-- Install the binding globally: `npm i -g @ducky7go/steamworks.js@0.1.4` (0.1.4 or later for Workshop screenshots; 0.1.5 or later to remove them). The shared scripts use `STEAMWORKS_JS` when it is set (a package folder containing `index.js`), otherwise the global install, and print the version they loaded. If the npm mirror in use lags the registry, add `--registry=https://registry.npmjs.org/`.
+- Install the binding globally: `npm i -g @hagicode/steamworks.js@0.1.4` (0.1.4 or later for Workshop screenshots; 0.1.5 or later to remove them). The shared scripts use `STEAMWORKS_JS` when it is set (a package folder containing `index.js`), otherwise the global install, and print the version they loaded. If the npm mirror in use lags the registry, add `--registry=https://registry.npmjs.org/`.
 - Confirm the Steam desktop client is running and logged in to the account that will act. Steam calls fail without it.
 - Confirm the AppID the code will use. Write operations must use the real AppID of the game or tool that owns the Workshop items. Never use a placeholder or a guessed value.
 
