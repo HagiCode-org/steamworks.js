@@ -4,6 +4,7 @@ use napi_derive::napi;
 #[napi]
 pub mod apps {
     use super::PlayerSteamId;
+    use napi::bindgen_prelude::Error;
     use steamworks::AppId;
 
     #[napi]
@@ -88,5 +89,22 @@ pub mod apps {
     pub fn current_beta_name() -> Option<String> {
         let client = crate::client::get_client();
         client.apps().current_beta_name()
+    }
+
+    /// @returns the command line the game was launched with, or an empty string
+    #[napi]
+    pub fn launch_command_line() -> String {
+        let client = crate::client::get_client();
+        client.apps().launch_command_line()
+    }
+
+    /// @returns the value of a query parameter from the Steam launch link, or an empty string when there is none
+    #[napi]
+    pub fn launch_query_param(key: String) -> Result<String, Error> {
+        if key.contains('\0') {
+            return Err(Error::from_reason("key must not contain a NUL character"));
+        }
+        let client = crate::client::get_client();
+        Ok(client.apps().launch_query_param(&key))
     }
 }

@@ -130,4 +130,25 @@ pub mod utils {
             false
         }
     }
+
+    /// @returns true when the Steam overlay is enabled for the running game
+    #[napi]
+    pub fn is_overlay_enabled() -> bool {
+        let client = crate::client::get_client();
+        client.utils().is_overlay_enabled()
+    }
+
+    /// @returns true when Steam is running in Big Picture mode
+    #[napi]
+    pub fn is_steam_in_big_picture_mode() -> bool {
+        let client = crate::client::get_client();
+        client.utils().is_steam_in_big_picture_mode()
+    }
+
+    /// @returns the language code of the Steam UI, for example `english` or `schinese`
+    #[napi]
+    pub fn get_ui_language() -> String {
+        let client = crate::client::get_client();
+        client.utils().ui_language()
+    }
 }

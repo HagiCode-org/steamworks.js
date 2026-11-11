@@ -34,6 +34,19 @@ pub mod callback {
         P2PSessionConnectFail,
         GameLobbyJoinRequested,
         MicroTxnAuthorizationResponse,
+        DownloadItemResult,
+        UserStatsReceived,
+        UserStatsStored,
+        UserAchievementStored,
+        GameOverlayActivated,
+        GameRichPresenceJoinRequested,
+        LobbyEnter,
+        LobbyChatMsg,
+        ScreenshotRequested,
+        ScreenshotReady,
+        NewUrlLaunchParameters,
+        AuthSessionTicketResponse,
+        ValidateAuthTicketResponse,
     }
 
     #[napi(ts_generic_types = "C extends keyof import('./callbacks').CallbackReturns")]
@@ -76,6 +89,45 @@ pub mod callback {
             }
             SteamCallback::MicroTxnAuthorizationResponse => {
                 register_callback::<steamworks::MicroTxnAuthorizationResponse>(threadsafe_handler)
+            }
+            SteamCallback::DownloadItemResult => {
+                register_callback::<steamworks::DownloadItemResult>(threadsafe_handler)
+            }
+            SteamCallback::UserStatsReceived => {
+                register_callback::<steamworks::UserStatsReceived>(threadsafe_handler)
+            }
+            SteamCallback::UserStatsStored => {
+                register_callback::<steamworks::UserStatsStored>(threadsafe_handler)
+            }
+            SteamCallback::UserAchievementStored => {
+                register_callback::<steamworks::UserAchievementStored>(threadsafe_handler)
+            }
+            SteamCallback::GameOverlayActivated => {
+                register_callback::<steamworks::GameOverlayActivated>(threadsafe_handler)
+            }
+            SteamCallback::GameRichPresenceJoinRequested => {
+                register_callback::<steamworks::GameRichPresenceJoinRequested>(threadsafe_handler)
+            }
+            SteamCallback::LobbyEnter => {
+                register_callback::<steamworks::LobbyEnter>(threadsafe_handler)
+            }
+            SteamCallback::LobbyChatMsg => {
+                register_callback::<steamworks::LobbyChatMsg>(threadsafe_handler)
+            }
+            SteamCallback::ScreenshotRequested => register_callback::<
+                steamworks::screenshots::ScreenshotRequested,
+            >(threadsafe_handler),
+            SteamCallback::ScreenshotReady => {
+                register_callback::<steamworks::screenshots::ScreenshotReady>(threadsafe_handler)
+            }
+            SteamCallback::NewUrlLaunchParameters => {
+                register_callback::<steamworks::NewUrlLaunchParameters>(threadsafe_handler)
+            }
+            SteamCallback::AuthSessionTicketResponse => {
+                register_callback::<steamworks::AuthSessionTicketResponse>(threadsafe_handler)
+            }
+            SteamCallback::ValidateAuthTicketResponse => {
+                register_callback::<steamworks::ValidateAuthTicketResponse>(threadsafe_handler)
             }
         };
 

@@ -144,4 +144,125 @@ pub mod input {
         let client = crate::client::get_client();
         client.input().shutdown()
     }
+
+    #[napi(object)]
+    pub struct DigitalActionData {
+        /// `true` while the digital action is pressed.
+        pub state: bool,
+        /// `false` when the action is not available for this controller.
+        pub active: bool,
+    }
+
+    #[napi(object)]
+    pub struct AnalogActionData {
+        pub x: f64,
+        pub y: f64,
+        /// `false` when the action is not available for this controller.
+        pub active: bool,
+    }
+
+    /// @param controllerHandle - a controller handle from `getConnectedControllers`
+    /// @param actionHandle - a digital action handle from `getDigitalAction`
+    #[napi]
+    pub fn get_digital_action_data(
+        controller_handle: BigInt,
+        action_handle: BigInt,
+    ) -> DigitalActionData {
+        let client = crate::client::get_client();
+        let data = client
+            .input()
+            .get_digital_action_data(controller_handle.get_u64().1, action_handle.get_u64().1);
+        DigitalActionData {
+            state: data.bState,
+            active: data.bActive,
+        }
+    }
+
+    /// @param actionHandle - an analog action handle from `getAnalogAction`
+    #[napi]
+    pub fn get_analog_action_data(
+        controller_handle: BigInt,
+        action_handle: BigInt,
+    ) -> AnalogActionData {
+        let client = crate::client::get_client();
+        let data = client
+            .input()
+            .get_analog_action_data(controller_handle.get_u64().1, action_handle.get_u64().1);
+        AnalogActionData {
+            x: f64::from(data.x),
+            y: f64::from(data.y),
+            active: data.bActive,
+        }
+    }
+
+    /// @returns the Steam action origins (numeric `EInputActionOrigin` values) bound to a digital action; empty when unbound
+    #[napi]
+    pub fn get_digital_action_origins(
+        controller_handle: BigInt,
+        action_set_handle: BigInt,
+        action_handle: BigInt,
+    ) -> Vec<u32> {
+        let client = crate::client::get_client();
+        client
+            .input()
+            .get_digital_action_origins(
+                controller_handle.get_u64().1,
+                action_set_handle.get_u64().1,
+                action_handle.get_u64().1,
+            )
+            .into_iter()
+            .map(|origin| origin as u32)
+            .collect()
+    }
+
+    /// @returns the Steam action origins (numeric `EInputActionOrigin` values) bound to an analog action; empty when unbound
+    #[napi]
+    pub fn get_analog_action_origins(
+        controller_handle: BigInt,
+        action_set_handle: BigInt,
+        action_handle: BigInt,
+    ) -> Vec<u32> {
+        let client = crate::client::get_client();
+        client
+            .input()
+            .get_analog_action_origins(
+                controller_handle.get_u64().1,
+                action_set_handle.get_u64().1,
+                action_handle.get_u64().1,
+            )
+            .into_iter()
+            .map(|origin| origin as u32)
+            .collect()
+    }
+
+    /// Steam's `EInputActionOrigin` is `#[non_exhaustive]`; discriminants 0 to 410 are its contiguous variants.
+    /// Values outside that range are not origins and are rejected rather than transmuted.
+    fn origin_from_u32(origin: u32) -> Option<steamworks::sys::EInputActionOrigin> {
+        if origin <= 410 {
+            // SAFETY: every value in 0..=410 is a discriminant of EInputActionOrigin (checked against the Steam headers).
+            Some(unsafe { std::mem::transmute::<u32, steamworks::sys::EInputActionOrigin>(origin) })
+        } else {
+            None
+        }
+    }
+
+    /// @returns the display name of an action origin, such as "A Button"; empty for an unknown origin
+    #[napi]
+    pub fn get_string_for_action_origin(origin: u32) -> String {
+        let Some(origin) = origin_from_u32(origin) else {
+            return String::new();
+        };
+        let client = crate::client::get_client();
+        client.input().get_string_for_action_origin(origin)
+    }
+
+    /// @returns the glyph image path of an action origin
+    #[napi]
+    pub fn get_glyph_for_action_origin(origin: u32) -> String {
+        let Some(origin) = origin_from_u32(origin) else {
+            return String::new();
+        };
+        let client = crate::client::get_client();
+        client.input().get_glyph_for_action_origin(origin)
+    }
 }

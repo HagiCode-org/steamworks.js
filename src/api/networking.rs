@@ -93,4 +93,70 @@ pub mod networking {
             .networking()
             .accept_p2p_session(SteamId::from_raw(steam_id64.get_u64().1));
     }
+
+    #[napi]
+    pub fn send_p2p_packet_on_channel(
+        steam_id64: BigInt,
+        send_type: SendType,
+        data: Buffer,
+        channel: i32,
+    ) -> bool {
+        let client = crate::client::get_client();
+        client.networking().send_p2p_packet_on_channel(
+            SteamId::from_raw(steam_id64.get_u64().1),
+            match send_type {
+                SendType::Unreliable => steamworks::SendType::Unreliable,
+                SendType::UnreliableNoDelay => steamworks::SendType::UnreliableNoDelay,
+                SendType::Reliable => steamworks::SendType::Reliable,
+                SendType::ReliableWithBuffering => steamworks::SendType::ReliableWithBuffering,
+            },
+            &data,
+            channel,
+        )
+    }
+
+    /// @returns the size of the next packet on the channel, or 0 when none is waiting
+    #[napi]
+    pub fn is_p2p_packet_available_on_channel(channel: i32) -> i32 {
+        let client = crate::client::get_client();
+        client
+            .networking()
+            .is_p2p_packet_available_on_channel(channel)
+            .unwrap_or_default() as i32
+    }
+
+    /// Reads the next packet on a channel. Rejects when no packet is waiting.
+    #[napi]
+    pub fn read_p2p_packet_from_channel(size: i32, channel: i32) -> Result<P2PPacket, Error> {
+        if size < 0 {
+            return Err(Error::from_reason("size must not be negative"));
+        }
+        let client = crate::client::get_client();
+        let mut buffer = vec![0; size as usize];
+
+        client
+            .networking()
+            .read_p2p_packet_from_channel(&mut buffer, channel)
+            .map(|(steam_id, read_size)| P2PPacket {
+                data: buffer.into(),
+                size: read_size as i32,
+                steam_id: PlayerSteamId::from_steamid(steam_id),
+            })
+            .ok_or_else(|| {
+                Error::new(
+                    napi::Status::GenericFailure,
+                    "No packet available".to_string(),
+                )
+            })
+    }
+
+    /// Closes the P2P session with a user.
+    /// @returns true when a session existed and was closed
+    #[napi]
+    pub fn close_p2p_session(steam_id64: BigInt) -> bool {
+        let client = crate::client::get_client();
+        client
+            .networking()
+            .close_p2p_session(SteamId::from_raw(steam_id64.get_u64().1))
+    }
 }
