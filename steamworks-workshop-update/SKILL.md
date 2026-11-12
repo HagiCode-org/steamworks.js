@@ -43,6 +43,24 @@ If the output includes `NEEDS_AGREEMENT`, the item stays hidden until the accoun
 - Running the same `upload --yes` again is the intended retry, because it updates the same item. Do it only after the read above, and only with the same content the user approved.
 - If a callback or progress output stalls, check the Steam client is still running before retrying.
 
+## Only the preview image changed
+
+Do not use `upload` for this. `upload` sends the content folder, the descriptions, the tags and the visibility every time, so a new preview would also publish whatever is built or edited locally to every subscriber (some items have tens of thousands). Use `preview`, which submits the preview image and the change note and nothing else:
+
+```bash
+python3 <skill>/steamworks-workshop-publish/scripts/workshop.py preview <item-dir> [--file preview.gif]            # dry run: plan only
+python3 <skill>/steamworks-workshop-publish/scripts/workshop.py preview <item-dir> --check                         # read-only: owner, app, current preview from Steam
+python3 <skill>/steamworks-workshop-publish/scripts/workshop.py preview <item-dir> --yes                           # after the go-ahead
+# an item without workshop/workshop.json: --app <AppID> --item <id> --file <image>
+# many items: --manifest manifest.json   ([{"app": 4348910, "id": "3838208693", "preview": "a/preview.gif", "name": "Mod"}, ...]), --only id,id
+```
+
+- **Checks it makes itself:** the file is PNG, JPG or GIF and at most 1,000,000 bytes; the item id is an existing one (never `0`); the item is owned by the logged-in account and belongs to the app given; afterwards the item is read back and the run fails if Steam still lists the old preview, then the live preview is downloaded and compared with the local file (a byte-identical result is reported; a re-encoded one is flagged for a look).
+- **Change note:** the two-line bilingual note is required here too. The default is `中文：预览图已更新。` / `English: The preview was updated.`; pass `--changenote` for another.
+- **Many items:** run the dry run and `--check` for the whole manifest first, send one low-traffic item with `--only <id>` and look at the result, then send the rest. A batch stops after three items fail in a row.
+- **An animated GIF** works as the main preview. Its first frame is what a static thumbnail shows, so make that frame the full still picture.
+- **Verify:** `status <item-dir> --remote` is for items with a folder; otherwise rely on the `verified:` line and `--check`. Report those lines, not just "done".
+
 ## Screenshots (extra pictures on an existing item)
 
 Screenshots are a separate update from the content update, and they change no title or content:
