@@ -52,7 +52,7 @@ def md_to_bbcode(md: str) -> str:
             open_list = None
 
     def inline(text: str) -> str:
-        text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+        text = re.sub(r"!\[[^\]]*\]\(([^)\s]+)\)", r"[img]\1[/img]", text)
         text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f"[url={m.group(2)}]{m.group(1)}[/url]", text)
         text = re.sub(r"\*\*(.+?)\*\*", r"[b]\1[/b]", text)
         text = re.sub(r"`([^`]+)`", r"[b]\1[/b]", text)
