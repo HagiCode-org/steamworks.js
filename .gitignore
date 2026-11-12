@@ -8,3 +8,5 @@ sdk/*
 !sdk/redistributable_bin/
 
 __pycache__/
+# Local gh-pages payload staged by docs/scripts/stage-payload.mjs
+/.deploy/

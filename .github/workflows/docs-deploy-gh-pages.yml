@@ -1,0 +1,85 @@
+name: Publish Docs to gh-pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "*/SKILL.md"
+      - ".github/gh-pages/**"
+      - ".github/workflows/docs-ci.yml"
+      - ".github/workflows/docs-deploy-gh-pages.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: steamworks-docs-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: docs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run verify
+      - run: node scripts/stage-payload.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steamworks-docs-gh-pages
+          path: .deploy/gh-pages/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment:
+      name: steamworks-docs
+      url: https://steamworks.hagicode.com
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: steamworks-docs-gh-pages
+          path: .deploy/gh-pages/
+      - name: Publish payload to gh-pages
+        id: publish
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./.deploy/gh-pages
+          publish_branch: gh-pages
+          force_orphan: true
+          enable_jekyll: false
+      - name: Write run summary
+        if: always()
+        env:
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+        run: |
+          {
+            echo "## steamworks.js docs publication"
+            if [ "$PUBLISH_OUTCOME" = "success" ]; then
+              echo "- gh-pages: published as a single commit"
+            else
+              echo "- gh-pages: publication did not complete (outcome: $PUBLISH_OUTCOME)"
+            fi
+            echo "- environment: https://steamworks.hagicode.com"
+            echo "- payload contents:"
+            find .deploy/gh-pages -mindepth 1 -maxdepth 1 -printf '  - %f\n' 2>/dev/null || echo "  - (no payload downloaded)"
+          } >> "$GITHUB_STEP_SUMMARY"
