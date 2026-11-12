@@ -1,0 +1,7 @@
+allowBuilds:
+  sharp: true
+  esbuild: true
+
+# First-party packages are published and consumed the same day, so exempt only that scope.
+minimumReleaseAgeExclude:
+  - "@hagicode/*"

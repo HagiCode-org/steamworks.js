@@ -1,0 +1,32 @@
+{
+  "name": "@hagicode/steamworks-docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import:sources": "node scripts/import-sources.mjs",
+    "dev": "pnpm run import:sources && astro dev",
+    "build": "export NODE_OPTIONS=\"${NODE_OPTIONS:-} --max-old-space-size=8192\"; pnpm run import:sources && astro build",
+    "check": "export NODE_OPTIONS=\"${NODE_OPTIONS:-} --max-old-space-size=8192\"; pnpm run import:sources && astro check",
+    "preview": "astro preview",
+    "test": "node --test test/*.test.mjs scripts/check-registry-neutrality.node-test.mjs",
+    "check:registry": "node scripts/check-registry-neutrality.mjs",
+    "verify": "pnpm run check:registry && pnpm run check && pnpm run build && pnpm run test"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.1",
+    "@astrojs/starlight": "^0.42.4",
+    "@hagicode/hagilight": "0.21.0",
+    "@hagicode/hagilight-core": "0.21.0",
+    "@hagicode/hagilight-starlight": "0.21.0",
+    "astro": "^7.3.8",
+    "github-slugger": "^2.0.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "^6.0.3",
+    "yaml": "^2.9.1"
+  },
+  "packageManager": "pnpm@12.16.1"
+}
