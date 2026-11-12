@@ -1,0 +1,9 @@
+{
+  "builtWithStarlight.label": "Built with Starlight",
+  "search.label": "Search",
+  "themeSelect.accessibleLabel": "Select theme",
+  "languageSelect.accessibleLabel": "Select language",
+  "menuButton.accessibleLabel": "Open navigation menu",
+  "sidebarNav.accessibleLabel": "Main navigation",
+  "tableOfContents.onThisPage": "On this page"
+}

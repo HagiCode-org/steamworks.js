@@ -1,0 +1,16 @@
+/* Site-owned styles. The shared shell owns the palette, themes, header and footer; this file only
+   sets the reading width and the focus outline. No side-stripe borders, glass panels or animation. */
+
+:root {
+  --sl-content-width: 46rem;
+  --steamworks-focus: #2563eb;
+}
+
+:root[data-theme="dark"] {
+  --steamworks-focus: #60a5fa;
+}
+
+:focus-visible {
+  outline: 2px solid var(--steamworks-focus);
+  outline-offset: 2px;
+}

@@ -46,6 +46,8 @@ To use steamworks.js you don't have to build anything, just install it from npm:
 npm i @hagicode/steamworks.js
 ```
 
+Guides and agent skills are on the documentation site at https://steamworks.hagicode.com/.
+
 ### Migration from `steamworks.js`
 
 If you were using the unscoped `steamworks.js` package, update your `package.json`:

@@ -33,6 +33,18 @@
 - Other projects can use a skill by symlinking its folder into their own `.claude/skills/`.
 - Settings that must not be committed stay out of the repo. The scripts read `STEAMWORKS_JS`, `WORKSHOP_TAGS_FILE` and `XDG_CACHE_HOME` from the environment.
 
+## Documentation site
+
+- `docs/` is a self-contained Astro + Starlight site with its own `package.json`, `pnpm-workspace.yaml` and `pnpm-lock.yaml`. Install and run it from `docs/` with `pnpm install --frozen-lockfile`. The root `package.json`, `pnpm-lock.yaml` and `pnpm-workspace.yaml` must not reference it.
+- `docs/src/content/docs/generated/` holds the guide and skill pages built from `README.md` and `*/SKILL.md`. It is git-ignored, and it is never edited by hand. Change `README.md` or the `SKILL.md`, then run `pnpm run import:sources`. `dev`, `build` and `check` run it first.
+- `docs/src/content/docs/index.mdx` is the only hand-written page.
+- Each `README.md` `##` section must be mapped to a guide page in `docs/scripts/page-map.mjs` or listed in `excludedSections`. Adding a section fails the import until it is mapped, and a renamed heading fails until the map is updated. A new skill folder needs no map change.
+- Tests for the importer: `pnpm exec node --test test/import-sources.test.mjs`, run from `docs/`.
+- Commands, all run from `docs/`: `pnpm run dev` (local server), `pnpm run build` (writes `docs/dist/`), `pnpm run check` (type and content check), `pnpm run test` (the suite; the site tests read `dist/`, so build first), and `pnpm run verify` (registry check, check, build, test in that order). CI and the publication build both run `verify`.
+- Payload contract: after `pnpm run build`, `node scripts/stage-payload.mjs` writes `.deploy/gh-pages/` at the repository root with `esa.jsonc` and `wrangler.jsonc` (copied from `.github/gh-pages/`) and `dist/`. It exits non-zero, naming the item, when one is missing. `.deploy/` is git-ignored.
+- `.github/workflows/docs-deploy-gh-pages.yml` publishes that payload to the `gh-pages` branch, only from `main`, as one commit with Jekyll disabled. It is isolated from `publish.yml` and the native and npm pipelines, and the docs tests fail if those workflows gain a build, publish or release step.
+- gh-pages is a publication artifact, and hosting is separate. Hosting, DNS and activating `steamworks.hagicode.com` for the payload are operations outside this repo.
+
 ## Build, test, format
 
 - Needs Node, pnpm, Rust, Clang, and an initialized `vendor/steamworks-rs`. Run `pnpm install`, then `pnpm run build:debug` (or `pnpm run build` for `--release`). Build only your own platform locally; CI builds all targets. `pnpm run prune` removes `dist`, `target` and `client.d.ts`.
