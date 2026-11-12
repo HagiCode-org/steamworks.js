@@ -15,7 +15,7 @@ This project is a fork of the upstream [steamworks.js](https://github.com/ceifa/
 It exists for my own development work, not as a general replacement for upstream. It is shaped around two needs:
 
 * **Working well with coding agents.** The repository carries agent guidance (`AGENTS.md`), task-oriented skills for Steam Workshop work (`steamworks-js/` and the `steamworks-workshop-*` folders), and a documentation site built from this README and those skills.
-* **Covering the Steamworks features my projects use.** Workshop publishing and updates (additional previews, preview-only and content-only updates, item dependencies, per-language titles and descriptions), plus friends, stats and leaderboards, networking sockets/messages/utils, the server browser, timeline, screenshots and Remote Play.
+* **Covering the Steamworks features my projects use.** Workshop publishing and updates (additional previews, preview-only and content-only updates, item dependencies, known game versions, per-language titles and descriptions), plus friends, stats and leaderboards, networking sockets/messages/utils, the server browser, timeline, screenshots and Remote Play.
 
 What that means in practice:
 
@@ -195,6 +195,32 @@ const removed = await client.workshop.removeDependency(modId, requiredId)
 
 - Both calls need a running, logged-in Steam client, and the parent must be an item the logged-in account owns.
 - An id that is negative or does not fit in 64 bits rejects before any Steam call. A failed call with no completion also rejects, and the error says the outcome is unknown, so check the item before retrying.
+
+## Workshop Known Game Versions
+
+An item can declare the game versions (Steam branches such as `open_beta` or `public`) it is valid for. Every item returned by a query carries those ranges in `supportedGameVersions`, and `updateItem` changes them with `requiredGameVersionMin` and `requiredGameVersionMax`:
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// read: one entry per range; an open end is left out (undefined)
+const item = await client.workshop.getItem(itemId)
+console.log(item.supportedGameVersions) // e.g. [{ minBranch: 'open_beta', maxBranch: 'open_beta' }, { minBranch: 'public' }]
+
+// change: valid for open_beta and every branch published after it; the content is sent in the same update
+await client.workshop.updateItem(itemId, {
+  contentPath: '/abs/path/mod-folder',
+  requiredGameVersionMin: 'open_beta',
+  requiredGameVersionMax: '',
+}, appId)
+```
+
+- `supportedGameVersions` comes with items from `getItem`, `getItems`, `getAllItems` and `getUserItems`. It is an empty list when Steam returns no range for the item.
+- Both change fields are optional. Setting one changes that end, and the other end is left open. Leaving both out keeps the range as it is.
+- Pass both as `""` to make the item valid for every game version again.
+- Steam applies the range only when the same update changes the item's content, so send `contentPath` with it. Otherwise Steam does not apply the range.
+- Changing the range needs a running, logged-in Steam client and an item the logged-in account owns.
 
 ## Workshop Multilingual Support
 
