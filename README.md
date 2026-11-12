@@ -2,22 +2,28 @@
 [![npm](https://img.shields.io/npm/v/@hagicode/steamworks.js.svg)](https://npmjs.com/package/@hagicode/steamworks.js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Steamworks.js
+# Steamworks.js (HagiCode fork)
 
-A modern implementation of the Steamworks SDK for HTML/JS and NodeJS based applications.
+Node.js and Electron bindings for the Steamworks SDK, maintained as a personal fork of [ceifa/steamworks.js](https://github.com/ceifa/steamworks.js).
 
-## Why
+Introduction, guides and agent skills: **https://steamworks.hagicode.com/**
 
-I used [greenworks](https://github.com/greenheartgames/greenworks) for a long time and it's great, but I gave up for the following reasons.
+## About this fork
 
-* It's not being maintained anymore.
-* It's not up to date.
-* It's not context-aware.
-* You have to build the binaries by yourself.
-* Don't have typescript definitions.
-* The API it's not trustful.
-* The API implement callbacks instead of return flags or promises.
-* I hate C++.
+This project is a fork of the upstream [steamworks.js](https://github.com/ceifa/steamworks.js) (Node/Electron bindings) and, through the `vendor/steamworks-rs` submodule, of [steamworks-rs](https://github.com/Noxime/steamworks-rs) (the Rust bindings it is built on). The Rust side lives in [HagiCode-org/steamworks-rs](https://github.com/HagiCode-org/steamworks-rs).
+
+It exists for my own development work, not as a general replacement for upstream. It is shaped around two needs:
+
+* **Working well with coding agents.** The repository carries agent guidance (`AGENTS.md`), task-oriented skills for Steam Workshop work (`steamworks-js/` and the `steamworks-workshop-*` folders), and a documentation site built from this README and those skills.
+* **Covering the Steamworks features my projects use.** Workshop publishing and updates (additional previews, preview-only and content-only updates, item dependencies, per-language titles and descriptions), plus friends, stats and leaderboards, networking sockets/messages/utils, the server browser, timeline, screenshots and Remote Play.
+
+What that means in practice:
+
+* The npm package is [`@hagicode/steamworks.js`](https://npmjs.com/package/@hagicode/steamworks.js), not the unscoped `steamworks.js`, and it is released on its own schedule.
+* Changes follow what I need, so there is no promise of staying in step with upstream. If you want the general-purpose library, use upstream.
+* Upstream's history is kept. All credit for the original design and implementation goes to the upstream authors, and the MIT license with the original copyright notice (Gabriel Francisco Dos Santos) is kept in [LICENSE](./LICENSE). The Steamworks SDK files bundled through `vendor/steamworks-rs` are not covered by that license and remain under Valve's terms.
+
+Bug reports and pull requests are still welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## API
 
@@ -46,11 +52,11 @@ To use steamworks.js you don't have to build anything, just install it from npm:
 npm i @hagicode/steamworks.js
 ```
 
-Guides and agent skills are on the documentation site at https://steamworks.hagicode.com/.
+Guides and agent skills are on the documentation site at https://steamworks.hagicode.com/. To try the latest build from `main`, install the `dev` dist-tag: `npm i @hagicode/steamworks.js@dev`.
 
-### Migration from `steamworks.js`
+### Migration from upstream `steamworks.js`
 
-If you were using the unscoped `steamworks.js` package, update your `package.json`:
+If you were using the unscoped upstream `steamworks.js` package and want this fork instead, update your `package.json`:
 
 ```json
 {
@@ -88,7 +94,7 @@ For the production build, copy the relevant distro files from `sdk/redistributab
 
 ## How to build
 
-> You **only** need to build if you are going to change something on steamworks.js code, if you are looking to just consume the library or use it in your game, refer to the [installation section](#installation).
+> You **only** need to build if you are going to change something on this fork's code. If you just want to use the library in your game, see the [installation section](#installation).
 
 Make sure you have the latest [node.js](https://nodejs.org/en/), [Rust](https://www.rust-lang.org/tools/install) and [Clang](https://rust-lang.github.io/rust-bindgen/requirements.html). We also need [Steam](https://store.steampowered.com/about/) installed and running.
 
@@ -110,7 +116,7 @@ git submodule update --init --recursive
 
 Install dependencies with `pnpm install` and then run `pnpm run build:debug` to build the library.
 
-There is no way to build for all targets easily. The good news is that you don't need to. You can develop and test on your current target, and open a PR. When the code is merged to main, a github action will build for all targets and publish a new version.
+There is no easy way to build for all targets locally, and you do not need to. Develop and test on your current target. When the code is merged to `main`, a GitHub Action builds every target and publishes a `dev` build.
 
 ### Testing Electron
 
@@ -472,7 +478,7 @@ client.cloud.setSyncPlatforms('save.json', 0 /* SyncPlatform.None */)
 
 ## Release Process
 
-This project uses automated release management:
+This fork has its own release line and publishes to npm as `@hagicode/steamworks.js`. It does not follow upstream's release numbers. Releases are automated:
 
 - **Dev builds**: Every push to the `main` branch publishes a build to the npm `dev` dist-tag for testing
 - **Release drafts**: Every push to `main` updates one draft GitHub release for the next `vX.Y.Z`, drafted by [hagi-release-drafter](https://github.com/HagiCode-org/hagi-release-drafter). It is never published automatically

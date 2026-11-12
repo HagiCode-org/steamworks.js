@@ -4,7 +4,7 @@
 
 - `@hagicode/steamworks.js`: Node/Electron bindings for the Steamworks SDK. A Rust native layer (`napi` 2.16 + `napi-derive`, crate `steamworksjs`, `cdylib`) wraps `steamworks-rs`, with a thin JS loader (`index.js`) and hand-maintained type declarations.
 - `package.json` is committed with `"version": "0.0.1"`. CI sets the real version with `npm version` before building and publishing; do not bump it for a release.
-- The README presents this as a replacement for greenworks. The upstream repo was not verified: no `upstream` remote is configured in this checkout.
+- This is a personal fork of `ceifa/steamworks.js` (confirmed by `LICENSE`, copyright Gabriel Francisco Dos Santos, and `.github/FUNDING.yml`), shaped for agent use and the maintainer's own projects. The README's "About this fork" section says so. No `upstream` remote is configured in this checkout.
 
 ## Layout
 

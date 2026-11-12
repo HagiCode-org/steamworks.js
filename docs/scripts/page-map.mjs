@@ -63,7 +63,7 @@ export const guidePages = [
 
 // README "##" sections intentionally left off the site, with the reason.
 export const excludedSections = {
-  Why: "The pitch is covered by the landing page.",
+  "About this fork": "The fork notice is covered by the landing page.",
 };
 
 export const skillRouter = "steamworks-js";
