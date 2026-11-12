@@ -36,9 +36,15 @@ const client = {
       log({
         call: 'update', itemId: String(itemId), language: details.language, title: details.title ?? null, visibility: details.visibility ?? null,
         changeNote: details.changeNote ?? null, tags: details.tags ?? null, contentPath: details.contentPath ?? null,
-        additionalPreviewPaths: details.additionalPreviewPaths ?? null,
+        additionalPreviewPaths: details.additionalPreviewPaths ?? null, previewPath: details.previewPath ?? null,
         removeAdditionalPreviewIndexes: details.removeAdditionalPreviewIndexes ?? null,
       });
+      if (details.previewPath && mode !== 'preview-not-applied') {
+        const s = readState();
+        s.previewCount = (s.previewCount || 0) + 1;
+        s.previewUrl = 'https://steam.example/preview-' + s.previewCount + path.extname(details.previewPath);
+        writeState(s);
+      }
       if (details.removeAdditionalPreviewIndexes && mode !== 'no-remove-support') {
         // Like steamworks.js: removes by 0-based index into the current list, highest index first.
         const s = readState();
@@ -62,7 +68,11 @@ const client = {
     },
     async getItem(id, config) {
       log({ call: 'getItem', itemId: String(id), includeAdditionalPreviews: config?.includeAdditionalPreviews ?? false });
-      const item = { publishedFileId: id, title: 'Fake title', visibility: 2, timeUpdated: 1700000000, tags: ['a'] };
+      const item = {
+        publishedFileId: id, title: 'Fake title', visibility: 2, timeUpdated: 1700000000, tags: ['a'],
+        owner: { steamId64: process.env.FAKE_STEAM_OWNER || '76561190000000000' }, consumerAppId: Number(process.env.FAKE_STEAM_APP || 4348910),
+        previewUrl: readState().previewUrl || 'https://steam.example/preview-0.png',
+      };
       if (config?.includeAdditionalPreviews) item.additionalPreviews = readState().previews;
       return item;
     },
@@ -836,4 +846,146 @@ test('the upload plan says videos are not part of the upload', { skip }, () => {
   const r = run(['upload', f.item], {}, f);
   assert.equal(r.code, 0, r.text);
   assert.match(r.out, /videos\s+not part of this upload; Steam takes videos only as YouTube links/);
+});
+
+// ---------------------------------------------------------------------------------------------- preview (main preview only)
+
+const previewItem = (f) => {
+  run(['init', f.item, '--app-id', '4348910', '--languages', 'english'], {}, f);
+  fillIn(f);
+  setRemoteId(f);
+  fs.writeFileSync(path.join(f.item, 'workshop', 'preview.gif'), 'GIF89a-bytes');
+};
+
+test('preview is a dry run without --yes: it prints the plan and sends nothing', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const r = run(['preview', f.item, '--file', path.join(f.item, 'workshop', 'preview.gif')], {}, f);
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.out, /item\s+3900000001\s+app 4348910/);
+  assert.match(r.out, /sent: the preview image and the change note only; no content, title, description, tags or visibility/);
+  assert.match(r.out, /dry run: nothing was sent to Steam/);
+  assert.equal(calls(f).length, 0, 'a dry run must not even start the Steam engine');
+});
+
+test('preview --yes sends only previewPath and the change note, then reads the preview back', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const gif = path.join(f.item, 'workshop', 'preview.gif');
+  const r = run(['preview', f.item, '--file', gif, '--yes', '--no-verify'], {}, f);
+  assert.equal(r.code, 0, r.text);
+  const sent = updates(f);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].itemId, FAKE_ITEM_ID);
+  assert.equal(sent[0].previewPath, gif);
+  for (const key of ['contentPath', 'title', 'visibility', 'tags', 'language', 'additionalPreviewPaths', 'removeAdditionalPreviewIndexes']) {
+    assert.ok(sent[0][key] == null, `a preview-only update must not send ${key}`);
+  }
+  assert.match(sent[0].changeNote, /^中文：预览图已更新。\nEnglish: The preview was updated\.$/);
+  assert.match(r.out, /PREVIEW_SET https:\/\/steam\.example\/preview-1\.gif/);
+  assert.equal(readMeta(f).publishedFileId, FAKE_ITEM_ID, 'workshop.json keeps the item id');
+});
+
+test('preview uses previewPath of workshop.json and a custom bilingual change note', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const meta = readMeta(f);
+  meta.previewPath = 'preview.gif';
+  fs.writeFileSync(path.join(f.item, 'workshop', 'workshop.json'), JSON.stringify(meta, null, 2));
+  const note = '中文：换成新的动图预览。\nEnglish: Switched to the new animated preview.';
+  const r = run(['preview', f.item, '--yes', '--no-verify', '--changenote', note], {}, f);
+  assert.equal(r.code, 0, r.text);
+  assert.ok(updates(f)[0].previewPath.endsWith('preview.gif'));
+  assert.equal(updates(f)[0].changeNote, note);
+});
+
+test('preview refuses bad input before Steam is called', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const gif = path.join(f.item, 'workshop', 'preview.gif');
+  const big = path.join(f.item, 'workshop', 'big.gif');
+  fs.writeFileSync(big, Buffer.alloc(1_000_001));
+  const txt = path.join(f.item, 'workshop', 'preview.txt');
+  fs.writeFileSync(txt, 'not an image');
+  const cases = [
+    [['preview', '--app', '4348910', '--item', '0', '--file', gif, '--yes'], /not 0 or empty|never creates an item/],
+    [['preview', '--app', '4348910', '--item', FAKE_ITEM_ID, '--file', big, '--yes'], /1000001 bytes/],
+    [['preview', '--app', '4348910', '--item', FAKE_ITEM_ID, '--file', txt, '--yes'], /must be one of/],
+    [['preview', '--app', '4348910', '--item', FAKE_ITEM_ID, '--file', path.join(f.base, 'missing.gif'), '--yes'], /is missing/],
+    [['preview', '--app', '4348910', '--item', FAKE_ITEM_ID, '--file', gif, '--yes', '--changenote', 'only one line'], /change note/],
+    [['preview', '--app', '4348910', '--yes'], /direct mode needs/],
+    [['preview', f.item, '--app', '4348910', '--item', FAKE_ITEM_ID, '--file', gif, '--yes'], /exactly one of/],
+  ];
+  for (const [args, pattern] of cases) {
+    const r = run(args, {}, f);
+    assert.notEqual(r.code, 0, `${args.join(' ')} should fail`);
+    assert.match(r.text, pattern);
+  }
+  assert.equal(calls(f).length, 0, 'none of these may reach Steam');
+});
+
+test('preview refuses an item the logged-in account does not own, or one that belongs to another app, and sends nothing', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const gif = path.join(f.item, 'workshop', 'preview.gif');
+  const base = ['preview', '--app', '4348910', '--item', FAKE_ITEM_ID, '--file', gif, '--yes', '--no-verify'];
+  const owner = run(base, { FAKE_STEAM_OWNER: '76561198000000001' }, f);
+  assert.notEqual(owner.code, 0);
+  assert.match(owner.text, /is owned by 76561198000000001, not by the logged-in account/);
+  const app = run(base, { FAKE_STEAM_APP: '3167020' }, f);
+  assert.notEqual(app.code, 0);
+  assert.match(app.text, /belongs to app 3167020, not 4348910/);
+  assert.equal(updates(f).length, 0);
+});
+
+test('preview fails when Steam still lists the same preview afterwards', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const r = run(['preview', f.item, '--file', path.join(f.item, 'workshop', 'preview.gif'), '--yes', '--no-verify'],
+    { FAKE_STEAM_MODE: 'preview-not-applied' }, f);
+  assert.notEqual(r.code, 0);
+  assert.match(r.text, /still lists the same preview/);
+  assert.match(r.text, /Read it again before retrying/);
+});
+
+test('preview --check reads the item and sends nothing', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const r = run(['preview', f.item, '--file', path.join(f.item, 'workshop', 'preview.gif'), '--check'], {}, f);
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.out, /PREVIEW_CHECK \{.*"owner":"76561190000000000"/);
+  assert.equal(updates(f).length, 0);
+  assert.ok(calls(f).some((c) => c.call === 'getItem'));
+});
+
+test('preview --manifest updates the listed items, --only narrows it, an unknown id is refused', { skip }, () => {
+  const f = fixture();
+  previewItem(f);
+  const second = path.join(f.base, 'second.gif');
+  fs.writeFileSync(second, 'GIF89a-second');
+  const manifest = path.join(f.base, 'manifest.json');
+  fs.writeFileSync(manifest, JSON.stringify([
+    { app: 4348910, id: FAKE_ITEM_ID, name: 'one', preview: path.join(f.item, 'workshop', 'preview.gif') },
+    { app: 4348910, id: '3900000002', name: 'two', preview: 'second.gif' },
+  ]));
+  const dry = run(['preview', '--manifest', manifest], {}, f);
+  assert.equal(dry.code, 0, dry.text);
+  assert.match(dry.out, /3900000001[\s\S]*3900000002/);
+  assert.equal(calls(f).length, 0);
+
+  const unknown = run(['preview', '--manifest', manifest, '--only', '1234', '--yes'], {}, f);
+  assert.notEqual(unknown.code, 0);
+  assert.match(unknown.text, /not in the manifest/);
+
+  const some = run(['preview', '--manifest', manifest, '--only', '3900000002', '--yes', '--no-verify'], {}, f);
+  assert.equal(some.code, 0, some.text);
+  assert.equal(updates(f).length, 1);
+  assert.equal(updates(f)[0].itemId, '3900000002');
+  assert.ok(updates(f)[0].previewPath.endsWith('second.gif'), 'a relative preview resolves next to the manifest');
+
+  fs.rmSync(f.log, { force: true });
+  const both = run(['preview', '--manifest', manifest, '--yes', '--no-verify'], {}, f);
+  assert.equal(both.code, 0, both.text);
+  assert.deepEqual(updates(f).map((u) => u.itemId), [FAKE_ITEM_ID, '3900000002']);
+  assert.match(both.out, /2 item\(s\) updated/);
 });

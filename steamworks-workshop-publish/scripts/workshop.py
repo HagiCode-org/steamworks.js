@@ -42,6 +42,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 import locales  # the english / schinese scope, shared with duckov-to-workshop.py; sits next to this file
@@ -59,6 +60,9 @@ TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 PLACEHOLDER = re.compile(r"TODO|\{\{")
 YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")  # a YouTube video id; Steam takes Workshop videos only as YouTube links
 SCREENSHOT_EXT = {".png", ".jpg", ".jpeg", ".gif"}  # the image types this skill accepts for extra screenshots
+PREVIEW_EXT = SCREENSHOT_EXT                         # and for the main preview (a GIF is an animated preview)
+PREVIEW_BUDGET = 1_000_000                           # bytes; Steam documents under 1 MB for a preview file
+PREVIEW_NOTE = "中文：预览图已更新。\nEnglish: The preview was updated."  # the default change note of `preview`
 
 
 class Fail(Exception):
@@ -643,6 +647,122 @@ def cmd_images_remove(args) -> None:
     print(f"workshop.json  {len(drop)} entr{'y' if len(drop) == 1 else 'ies'} removed from \"screenshots\"")
 
 
+def preview_targets(args) -> list[dict]:
+    """The items `preview` acts on: [{name, app, id, file}], from an item folder, from --app/--item/--file, or from a manifest."""
+    given = [bool(args.item_dir), bool(args.manifest), args.item is not None or args.app is not None]
+    if sum(given) != 1:
+        raise Fail("give exactly one of: an item folder, --manifest FILE, or --app N --item ID --file IMAGE")
+    targets: list[dict] = []
+    if args.item_dir:
+        meta, p = load(args.item_dir)
+        file = Path(args.file).expanduser().resolve() if args.file else (p["meta_dir"] / meta.get("previewPath", "preview.png")).resolve()
+        targets.append({"name": p["item"].name, "app": meta.get("appId"), "id": str(meta.get("publishedFileId")), "file": file})
+    elif args.manifest:
+        manifest = Path(args.manifest).expanduser().resolve()
+        try:
+            rows = json.loads(manifest.read_text("utf-8"))
+        except (OSError, ValueError) as e:
+            raise Fail(f"cannot read the manifest {manifest}: {e}")
+        if not isinstance(rows, list) or not rows:
+            raise Fail("the manifest must be a non-empty JSON list of {app, id, preview[, name]}")
+        for row in rows:
+            if not isinstance(row, dict) or not {"app", "id", "preview"} <= set(row):
+                raise Fail(f"every manifest entry needs app, id and preview: {row!r}")
+            targets.append({"name": str(row.get("name") or row["id"]), "app": row["app"], "id": str(row["id"]),
+                            "file": (manifest.parent / str(row["preview"])).expanduser().resolve()})
+        if args.only:
+            wanted = {x.strip() for x in args.only.split(",") if x.strip()}
+            unknown = wanted - {t["id"] for t in targets}
+            if unknown:
+                raise Fail(f"--only names items that are not in the manifest: {', '.join(sorted(unknown))}")
+            targets = [t for t in targets if t["id"] in wanted]
+    else:
+        if args.app is None or args.item is None or not args.file:
+            raise Fail("direct mode needs --app N, --item ID and --file IMAGE together")
+        targets.append({"name": str(args.item), "app": args.app, "id": str(args.item), "file": Path(args.file).expanduser().resolve()})
+    for t in targets:
+        label = f"item {t['id']} ({t['name']})"
+        if not is_int(t["app"]) or t["app"] <= 0:
+            raise Fail(f"{label}: the AppID must be a positive number")
+        if not re.fullmatch(r"\d+", t["id"]) or t["id"] == "0":
+            raise Fail(f"{label}: the item id must be an existing Workshop id (not 0 or empty); `preview` never creates an item")
+        if t["file"].suffix.lower() not in PREVIEW_EXT:
+            raise Fail(f"{label}: the preview must be one of {', '.join(sorted(PREVIEW_EXT))}, not {t['file'].suffix or 'no extension'}")
+        if not t["file"].is_file():
+            raise Fail(f"{label}: preview file {t['file']} is missing")
+        t["bytes"] = t["file"].stat().st_size
+        if t["bytes"] > PREVIEW_BUDGET:
+            raise Fail(f"{label}: the preview is {t['bytes']} bytes; keep it at most {PREVIEW_BUDGET}")
+    if len({t["id"] for t in targets}) != len(targets):
+        raise Fail("the same item id appears twice")
+    return targets
+
+
+def run_preview_engine(t: dict, note: str, check: bool) -> tuple[int, list[str]]:
+    cmd = ["node", str(STEAM_SCRIPT), "set-preview", "--app", str(t["app"]), "--item", t["id"], "--preview", str(t["file"]),
+           "--changenote", note] + (["--check"] if check else [])
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    lines = []
+    for line in proc.stdout:  # type: ignore[union-attr]
+        lines.append(line.rstrip("\n"))
+        if not line.startswith(("steam user", "steamworks.js")):
+            sys.stdout.write(line)
+            sys.stdout.flush()
+    return proc.wait(), lines
+
+
+def verify_live_preview(url: str, file: Path) -> str:
+    """Download the preview Steam lists now and compare it with the local file. Informational: never fails the run."""
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r:
+            data = r.read()
+    except Exception as e:  # the network or Steam's image host may be briefly unavailable
+        return f"could not download the live preview to compare it ({e}); look at the item page"
+    if data == file.read_bytes():
+        return f"verified: the live preview is byte-identical to {file.name} ({len(data)} bytes)"
+    return f"the live preview ({len(data)} bytes) differs from {file.name}; Steam may re-encode the image, so look at it on the item page"
+
+
+def cmd_preview(args) -> None:
+    """Replace only the main preview of existing items. Unlike `upload`, this resends no content, title, description or tags."""
+    note = args.changenote if args.changenote is not None else PREVIEW_NOTE
+    problems = locales.change_note_problems(note)
+    if problems:
+        raise Fail("change note for this update: " + "; ".join(problems) + f"\nexample:\n{locales.CHANGE_NOTE_EXAMPLE}")
+    targets = preview_targets(args)
+    print(f"change note {note!r}")
+    for t in targets:
+        print(f"item       {t['id']}  app {t['app']}  {t['name']}: {t['file'].name} ({t['bytes']} bytes)")
+    print("sent: the preview image and the change note only; no content, title, description, tags or visibility")
+    if not args.yes and not args.check:
+        print(f"dry run: nothing was sent to Steam ({len(targets)} item(s)). Re-run with --check to read each item from Steam "
+              "(owner, app, current preview), or with --yes to replace the previews.")
+        return
+    if shutil.which("node") is None:
+        raise Fail("node is not on PATH (steam-workshop.mjs needs Node.js)")
+    failed, in_a_row, done = [], 0, 0
+    for t in targets:
+        print(f"--- {t['id']} {t['name']}")
+        code, lines = run_preview_engine(t, note, check=not args.yes)
+        if code != 0:
+            failed.append(t["id"]); in_a_row += 1
+            print(f"FAILED {t['id']} (exit {code}); nothing else was changed for this item. Read it again before retrying "
+                  "(`status <item-dir> --remote`); running the same command again is the retry")
+            if in_a_row >= 3 and len(targets) > 3:
+                raise Fail(f"three items failed in a row; stopped after {t['id']}; fix the cause (Steam client running and logged in?) first")
+            continue
+        in_a_row = 0
+        done += 1
+        if args.yes and not args.no_verify:
+            url = next((x.split(" ", 1)[1] for x in lines if x.startswith("PREVIEW_SET ")), None)
+            if url:
+                print(verify_live_preview(url, t["file"]))
+    verb = "updated" if args.yes else "checked"
+    print(f"{done} item(s) {verb}" + (f", {len(failed)} failed: {', '.join(failed)}" if failed else ""))
+    if failed:
+        raise Fail(f"{len(failed)} item(s) failed")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="workshop.py", description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -673,6 +793,19 @@ def build_parser() -> argparse.ArgumentParser:
                                         "(default: changeNote in workshop.json)")
     s.add_argument("--yes", action="store_true", help="actually submit to Steam (without it, nothing is sent)")
     s.set_defaults(fn=cmd_upload)
+
+    s = sub.add_parser("preview", help="replace only the main preview of existing items (animated GIF allowed); no content is resent")
+    s.add_argument("item_dir", nargs="?", help="an item folder with workshop/workshop.json (appId, publishedFileId, previewPath)")
+    s.add_argument("--file", help="the preview image to send (default: previewPath of workshop.json); required with --app/--item")
+    s.add_argument("--app", type=int, help="direct mode: the game's AppID")
+    s.add_argument("--item", help="direct mode: the existing Workshop item id")
+    s.add_argument("--manifest", help="batch mode: a JSON list of {app, id, preview[, name]}; relative previews resolve next to the file")
+    s.add_argument("--only", help="with --manifest: comma-separated item ids to act on")
+    s.add_argument("--changenote", help=f"two-line bilingual change note (default: {PREVIEW_NOTE!r})")
+    s.add_argument("--check", action="store_true", help="read each item from Steam (owner, app, current preview); sends nothing")
+    s.add_argument("--yes", action="store_true", help="actually replace the previews on Steam (without it, nothing is sent)")
+    s.add_argument("--no-verify", action="store_true", help="do not download the live preview afterwards to compare it")
+    s.set_defaults(fn=cmd_preview)
 
     s = sub.add_parser("status", help="show the stored item identity; --remote asks Steam")
     s.add_argument("item_dir")

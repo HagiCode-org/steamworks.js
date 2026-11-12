@@ -9,6 +9,7 @@
 //   node steam-workshop.mjs add-previews --app <AppID> --item <id> --files <json>   (json: array of absolute image paths)
 //   node steam-workshop.mjs remove-previews --app <AppID> --item <id> --indexes <json>   (json: array of 0-based indexes into additionalPreviews)
 //   node steam-workshop.mjs info --app <AppID> --item <id>
+//   node steam-workshop.mjs set-preview --app <AppID> --item <id> --preview <image> [--changenote <中文：…\nEnglish: …>] [--check]
 //
 // --translations: [{"language", "title", "description"}, ...]; the first entry is the primary language and is sent with
 // the content. Every other entry is sent as its own text-only update, so each player sees one language, never a mix.
@@ -22,6 +23,12 @@
 // remove-previews sends only the removal (no content, no title change), then reads the item back and checks that every
 // removed file is gone; it prints `PREVIEW_REMOVED <file>`. The indexes refer to the list `info` shows, as read just before.
 // Only steamworks.js 0.1.5 and later can remove screenshots; an older build is refused before Steam is contacted.
+//
+// set-preview replaces only the item's main preview image: no content, title, description, tags or visibility is sent (the
+// update carries previewPath and the change note, nothing else). It first reads the item and refuses when the item is not
+// owned by the logged-in account or belongs to another app, then submits, then reads the item back and fails when Steam still
+// lists the same preview. Output: `PREVIEW_SET <url>` (the preview Steam now lists), `NEEDS_AGREEMENT`, `DONE <id>`, `URL <url>`.
+// --check is read-only: it prints `PREVIEW_CHECK <json>` (title, owner, visibility, current preview) and sends nothing.
 //
 // steamworks.js is found in this order: STEAMWORKS_JS (the package folder that contains index.js), else the
 // @hagicode/steamworks.js package installed globally (`npm i -g @hagicode/steamworks.js@0.1.4`). Nothing is read from a fixed path.
@@ -284,6 +291,45 @@ if (command === 'info') {
   }
   console.log(`URL https://steamcommunity.com/sharedfiles/filedetails/?id=${itemId}`);
   finish(0);
+} else if (command === 'set-preview') {
+  if (item === '0') fail('--item must be an existing item (0 would create one; use `publish`)');
+  const checkOnly = rest.includes('--check');
+  const changeNote = opt('changenote') ?? '';
+  const preview = path.resolve(need('preview'));
+  if (!existsSync(preview)) fail(`${preview} does not exist`);
+  if (!checkOnly && !changeNote.trim()) fail('--changenote is required: a change note with a "中文：" line and an "English: " line');
+  try {
+    const me = String(client.localplayer.getSteamId().steamId64);
+    const before = await client.workshop.getItem(BigInt(item), {});
+    if (!before) fail(`Steam returned no item ${item}`);
+    const owner = String(before.owner?.steamId64 ?? '');
+    const summary = {
+      publishedFileId: String(before.publishedFileId), title: before.title, owner, visibility: before.visibility,
+      consumerAppId: before.consumerAppId, preview: before.previewUrl ?? null,
+    };
+    if (owner !== me) fail(`item ${item} is owned by ${owner || 'someone else'}, not by the logged-in account ${me}; nothing was sent`);
+    if (before.consumerAppId !== appId) fail(`item ${item} belongs to app ${before.consumerAppId}, not ${appId}; nothing was sent`);
+    if (checkOnly) {
+      console.log(`PREVIEW_CHECK ${json(summary)}`);
+      finish(0);
+    }
+    const result = await submit(BigInt(item), { previewPath: preview, changeNote }, 'preview');
+    const after = await client.workshop.getItem(BigInt(item), {});
+    if (!after?.previewUrl || after.previewUrl === before.previewUrl) {
+      fail(`Steam still lists the same preview for item ${item} after the update; check the item page before trying again`);
+    }
+    console.log(`PREVIEW_SET ${after.previewUrl}`);
+    if (result.agreement) {
+      console.log('NEEDS_AGREEMENT');
+      console.log('The item stays hidden until the Workshop legal agreement is accepted on the Steam website with this account.');
+    }
+    console.log(`DONE ${item}`);
+    console.log(`URL https://steamcommunity.com/sharedfiles/filedetails/?id=${item}`);
+    finish(0);
+  } catch (e) {
+    console.error(`\nerror: ${e.message ?? e}`);
+    finish(1);
+  }
 } else {
-  fail('usage: steam-workshop.mjs publish|add-previews|remove-previews|info --app <AppID> --item <id> [...]');
+  fail('usage: steam-workshop.mjs publish|add-previews|remove-previews|set-preview|info --app <AppID> --item <id> [...]');
 }
