@@ -308,6 +308,16 @@ pub mod workshop {
         pub preview_type: ItemPreviewType,
     }
 
+    /// A game version (Steam branch) range a Workshop item is valid for.
+    /// `minBranch` / `maxBranch` are branch names such as `open_beta`. An open end is left out
+    /// (`undefined`): no `minBranch` starts at the earliest branch, no `maxBranch` runs through the newest.
+    #[derive(Debug)]
+    #[napi(object)]
+    pub struct SupportedGameVersion {
+        pub min_branch: Option<String>,
+        pub max_branch: Option<String>,
+    }
+
     /// Helper function to extract additional previews from Steam API query results.
     fn get_additional_previews(
         results: &steamworks::QueryResults,
@@ -369,6 +379,8 @@ pub mod workshop {
         pub children: Option<Vec<BigInt>>,
         /// Additional preview media (images, videos, etc.) for the workshop item
         pub additional_previews: Option<Vec<AdditionalPreview>>,
+        /// Game versions (Steam branches) the item is valid for. Empty when Steam returns no range.
+        pub supported_game_versions: Vec<SupportedGameVersion>,
     }
 
     impl WorkshopItem {
@@ -416,6 +428,14 @@ pub mod workshop {
                     statistics: WorkshopItemStatistic::from_query_results(results, index),
                     children,
                     additional_previews,
+                    supported_game_versions: results
+                        .supported_game_versions(index)
+                        .into_iter()
+                        .map(|version| SupportedGameVersion {
+                            min_branch: version.min,
+                            max_branch: version.max,
+                        })
+                        .collect(),
                 }
             })
         }

@@ -61,6 +61,13 @@ pub mod workshop {
         pub tags: Option<Vec<String>>,
         pub visibility: Option<UgcItemVisibility>,
         pub language: Option<String>,
+        /// Oldest game version (Steam branch, e.g. `open_beta`) the item is valid for.
+        /// Set either required-version field to change the range; the unset end becomes open.
+        /// Pass both as `""` to make the item valid for every game version again.
+        /// Steam applies the range only when this update also changes the item's content.
+        pub required_game_version_min: Option<String>,
+        /// Newest game version (Steam branch) the item is valid for; see `requiredGameVersionMin`.
+        pub required_game_version_max: Option<String>,
     }
 
     impl UgcUpdate {
@@ -115,6 +122,15 @@ pub mod workshop {
 
             if let Some(visibility) = self.visibility {
                 update = update.visibility(visibility.into());
+            }
+
+            // Only touch the range when the caller set one end: Steam would otherwise open it to every game version.
+            if self.required_game_version_min.is_some() || self.required_game_version_max.is_some()
+            {
+                update = update.required_game_versions(
+                    self.required_game_version_min.as_deref(),
+                    self.required_game_version_max.as_deref(),
+                );
             }
 
             let change_note = self.change_note.as_deref();
@@ -240,6 +256,8 @@ pub mod workshop {
                 tags: None,
                 visibility: None,
                 language: None,
+                required_game_version_min: None,
+                required_game_version_max: None,
             },
             app_id,
         )
@@ -286,6 +304,8 @@ pub mod workshop {
                 tags: None,
                 visibility: None,
                 language: None,
+                required_game_version_min: None,
+                required_game_version_max: None,
             },
             app_id,
         )

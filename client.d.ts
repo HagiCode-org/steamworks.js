@@ -903,6 +903,15 @@ export declare namespace workshop {
     tags?: Array<string>
     visibility?: UgcItemVisibility
     language?: string
+    /**
+     * Oldest game version (Steam branch, e.g. `open_beta`) the item is valid for.
+     * Set either required-version field to change the range; the unset end becomes open.
+     * Pass both as `""` to make the item valid for every game version again.
+     * Steam applies the range only when this update also changes the item's content.
+     */
+    requiredGameVersionMin?: string
+    /** Newest game version (Steam branch) the item is valid for; see `requiredGameVersionMin`. */
+    requiredGameVersionMax?: string
   }
   export interface InstallInfo {
     folder: string
@@ -1118,6 +1127,15 @@ export declare namespace workshop {
     /** Type of preview (image, video, sketchfab model, etc.) */
     previewType: ItemPreviewType
   }
+  /**
+   * A game version (Steam branch) range a Workshop item is valid for.
+   * `minBranch` / `maxBranch` are branch names such as `open_beta`. An open end is left out
+   * (`undefined`): no `minBranch` starts at the earliest branch, no `maxBranch` runs through the newest.
+   */
+  export interface SupportedGameVersion {
+    minBranch?: string
+    maxBranch?: string
+  }
   export interface WorkshopItem {
     publishedFileId: bigint
     creatorAppId?: number
@@ -1145,6 +1163,8 @@ export declare namespace workshop {
     children?: Array<bigint>
     /** Additional preview media (images, videos, etc.) for the workshop item */
     additionalPreviews?: Array<AdditionalPreview>
+    /** Game versions (Steam branches) the item is valid for. Empty when Steam returns no range. */
+    supportedGameVersions: Array<SupportedGameVersion>
   }
   export interface WorkshopPaginatedResult {
     items: Array<WorkshopItem | undefined | null>
