@@ -1,11 +1,11 @@
 ---
 name: steamworks-workshop-publish
-description: Publish a new Steam Workshop item or update one with steamworks.js, through the running Steam client without a password. Provides the shared scripts (workshop.py init/check/pack/upload/status and steam-workshop.mjs) and the per-item storage layout (workshop/workshop.json, descriptions, preview, publishedFileId). Items default to public; a private (hidden) test upload is optional. Covers per-language titles and descriptions, tags, extra screenshots (list and add), replacing only the main preview (`workshop.py preview`, animated GIF allowed), the Workshop legal agreement, and the item id that must be kept. Use for 创意工坊 发布 / 首次上传 / 预览图 / 标题描述 / 更新说明 (变更说明, bilingual, required) / 可见性 / 协议提示 / publishedFileId / workshop.json / createItem. Submits remote content; needs explicit confirmation. Requires the steamworks-js setup first.
+description: Publish a new Steam Workshop item or update one with steamworks.js, through the running Steam client without a password. Provides the shared scripts (workshop.py init/check/pack/upload/status and steam-workshop.mjs) and the per-item storage layout (workshop/workshop.json, descriptions, preview, publishedFileId). Items default to public; a private (hidden) test upload is optional. Covers per-language titles and descriptions, tags, extra screenshots (list and add), replacing only the main preview (`workshop.py preview`, animated GIF allowed), the Workshop legal agreement, and the item id that must be kept. Use for 创意工坊 发布 / 首次上传 / 预览图 / 标题描述 / 更新说明 (变更说明, bilingual, required) / 可见性 / 协议提示 / publishedFileId / workshop.json / createItem. Submits remote content; needs explicit confirmation. Every write to Steam (upload, preview, images upload, images remove) needs a confirmed dry run first: the write runs with WORKSHOP_WRITE_CONFIRMED=1 (see Confirmed writes). Requires the steamworks-js setup first.
 ---
 
 # steamworks-workshop-publish
 
-**Impact: submits remote content.** Nothing is sent to Steam unless `upload` gets `--yes`, and a submitted update cannot be cancelled. Before `--yes`, confirm with the user: the account, the AppID, the item (new, or which `publishedFileId`), the visibility, the files, and the preview.
+**Impact: submits remote content.** Nothing is sent to Steam unless `upload` gets `--yes`, and a submitted update cannot be cancelled. Every `--yes` that writes to Steam (`upload`, `preview`, `images upload`, `images remove`) also needs `WORKSHOP_WRITE_CONFIRMED=1`, which the caller sets only after the user confirms the dry run (see [Confirmed writes](#confirmed-writes)). Before `--yes`, confirm with the user: the account, the AppID, the item (new, or which `publishedFileId`), the visibility, the files, and the preview.
 
 Complete the setup in [`steamworks-js`](../steamworks-js/SKILL.md) first: Node, `@hagicode/steamworks.js` 0.1.4 or later installed globally (or `STEAMWORKS_JS`), a running logged-in Steam client, and an account that owns the app. Screenshot uploads need 0.1.4 or later, and removing screenshots needs 0.1.5 or later; the scripts refuse older builds.
 
@@ -26,9 +26,32 @@ Chinese first, then English; the English entry reads English first, then Chinese
 `scripts/locales.py`). A composed title is at most 128 characters and is checked before anything is staged. Without `titles`,
 each stored title is uploaded unchanged. The composition happens in memory: `workshop.json` is never rewritten.
 
-`workshop.py upload` is the single route to Steam. Run `workshop.py check`, then `pack`, then a dry-run `upload` (read the `skip:` lines and
-the `title` lines), then `upload --yes`. `scripts/steam-workshop.mjs` is the engine behind `upload`: it refuses any language
-other than `english` and `schinese` before it contacts Steam, and it is not run by hand to publish.
+`workshop.py upload` is the single route to Steam. `check`, `pack`, and the dry-run `upload` (read the `skip:` lines and the
+`title` lines) run without any variable. `upload --yes` needs `WORKSHOP_WRITE_CONFIRMED=1` (see [Confirmed writes](#confirmed-writes)).
+`scripts/steam-workshop.mjs` is the engine behind `upload`: it refuses any language other than `english` and `schinese` before
+it contacts Steam, and it is not run by hand to publish.
+
+## Confirmed writes
+
+Every command that writes to Steam takes `--yes` and needs `WORKSHOP_WRITE_CONFIRMED=1` in its environment: `upload`, `preview`
+(every mode), `images upload` and `images remove`. Without the variable, `--yes` is refused before anything is read or staged.
+Dry runs (no `--yes`) and the read-only commands (`check`, `pack`, `tags`, `status`, `images list`, `videos list`, `preview --check`)
+need no variable and send nothing.
+
+The variable belongs to the caller that runs the publish (a script, a CI job, or an agent acting for the user), not to someone
+typing commands. The caller follows this order:
+
+1. Run the command without `--yes`. This dry run prints the plan. `preview --check` also reads the item from Steam and changes nothing.
+2. Show the plan to the user: the account, the AppID, the item, the visibility, the files, the preview, the change note and, for
+   images, the file names.
+3. After the user confirms that exact plan, run the same command with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1` in its environment.
+
+The script cannot check who set the variable or whether the user really confirmed. It stops accidental writes; it does not grant
+authorization. Do not set the variable to skip step 2. How a particular runner wires these steps belongs in that runner's own
+documentation, not here.
+
+Read-only commands and dry runs need no confirmation. The `preview` direct modes (`--app/--item/--file` for an item without a
+`workshop/` folder, and `--manifest` for many items) need the same variable for `--yes` as the item-folder mode.
 
 ## Tags
 
@@ -68,14 +91,14 @@ Run from any directory; `<item-dir>` is the folder that owns the item.
 | `scripts/workshop.py tags <item-dir>` | Prints the Workshop tags Steam declares for the item's `appId`, and the item's own `tags`. | Read-only (public page) |
 | `scripts/workshop.py pack <item-dir>` | Runs `check`, then stages the included files and `translations.json` in `workshop/.build/`. | No |
 | `scripts/workshop.py upload <item-dir> [--visibility V] [--changenote T]` | Dry run: prints the plan, the `skip:` lines, the composed titles and the change note (`T` is the two-line bilingual note, see [Change note](#change-note-更新说明)). | No |
-| `scripts/workshop.py upload <item-dir> ... --yes` | Packs, then creates or updates the item; saves the new `publishedFileId` the moment Steam returns it. | **Yes** |
+| `scripts/workshop.py upload <item-dir> ... --yes` | Packs, then creates or updates the item; saves the new `publishedFileId` the moment Steam returns it. Needs `WORKSHOP_WRITE_CONFIRMED=1` (see [Confirmed writes](#confirmed-writes)). | **Yes**, with the variable |
 | `scripts/workshop.py status <item-dir> [--remote]` | Shows the stored identity; `--remote` reads the item from Steam. | Read-only |
 | `scripts/workshop.py images list <item-dir>` | Lists the screenshots Steam has for the item and the ones listed in `workshop.json`. | Read-only |
-| `scripts/workshop.py images upload <item-dir> [--yes]` | Adds the listed screenshots that Steam does not have yet (matched by file name). Sends no content and changes no title. | Dry run; **Yes** with `--yes` |
+| `scripts/workshop.py images upload <item-dir> [--yes]` | Adds the listed screenshots that Steam does not have yet (matched by file name). Sends no content and changes no title. | Dry run; **Yes** with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1` |
 | `scripts/workshop.py preview <item-dir> [--file IMAGE] [--changenote T]` (or `--app N --item ID --file IMAGE`, or `--manifest FILE [--only IDS]`) | Dry run: prints which items get which preview file and the change note. `--check` reads each item from Steam (owner, app, current preview) and sends nothing. | Dry run; read-only with `--check` |
-| `scripts/workshop.py preview ... --yes` | Replaces **only the main preview** of existing items, in one update each. Sends no content, title, description, tags or visibility (`upload` resends all of them). Refuses an item the logged-in account does not own or that belongs to another app, reads the item back and fails if Steam still lists the old preview, then downloads the live preview and compares it with the local file. PNG, JPG or GIF (an animated GIF is allowed), at most 1,000,000 bytes. | **Yes** |
+| `scripts/workshop.py preview ... --yes` | Replaces **only the main preview** of existing items, in one update each. Sends no content, title, description, tags or visibility (`upload` resends all of them). Refuses an item the logged-in account does not own or that belongs to another app, reads the item back and fails if Steam still lists the old preview, then downloads the live preview and compares it with the local file. PNG, JPG or GIF (an animated GIF is allowed), at most 1,000,000 bytes. Needs `WORKSHOP_WRITE_CONFIRMED=1`. | **Yes**, with the variable |
 | `scripts/workshop.py videos list <item-dir> [--remote]` | Lists the `videos` in `workshop.json` with their YouTube links; with `--remote` also says which ones Steam shows and which Steam shows that are not listed. | Read-only |
-| `scripts/workshop.py images remove <item-dir> <file-name>... [--yes]` | Removes the named screenshots from the item on Steam, in one update. Each name must be on Steam now (`images list`); an unknown name stops the run. Changes no content or title. With `--yes`, also drops those entries from `screenshots` in `workshop.json`. | Dry run; **Yes** with `--yes` |
+| `scripts/workshop.py images remove <item-dir> <file-name>... [--yes]` | Removes the named screenshots from the item on Steam, in one update. Each name must be on Steam now (`images list`); an unknown name stops the run. Changes no content or title. With `--yes`, also drops those entries from `screenshots` in `workshop.json`. | Dry run; **Yes** with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1` |
 
 Under the hood, `upload --yes` runs `scripts/steam-workshop.mjs publish`. It sends the item's `tags` every time (an empty list clears them), creates the item (only when `publishedFileId` is `"0"`), sends the primary language with the content and preview, and then sends each other language as a text-only update.
 
@@ -85,7 +108,7 @@ Under the hood, `upload --yes` runs `scripts/steam-workshop.mjs publish`. It sen
 2. **Set up the item**: a Duckov mod runs `duckov-to-workshop.py` with `--content` pointing at that build folder; any other item runs `init` once and then writes the titles, descriptions, and preview. Set `include` if the built folder holds more than the game accepts. Set `tags` from `workshop.py tags <item-dir>`, the game's own list; never copy them from another game's item. Write `changeNote` as the two-line bilingual note (see [Change note](#change-note-更新说明)); `check` fails until it is there.
 3. **Check**: `check`, then `pack`. Read the staged file list against what the game accepts.
 4. **Dry run**: `upload <item-dir>` with no `--yes`. Show the printed plan to the user, including the skip lines, the composed titles and the change note (both the Chinese and the English line).
-5. **Upload as public** (the default): `upload --yes`, with `visibility` `public` from `workshop.json`. Open the item URL and confirm it shows.
+5. **Upload as public** (the default): after the user confirms the dry run, `upload --yes` with `WORKSHOP_WRITE_CONFIRMED=1`, with `visibility` `public` from `workshop.json`. Open the item URL and confirm it shows.
 6. **Private test only when the user asks**: pass `--visibility hidden` for that upload, check it as the owner, then upload again with `--visibility public` (or set `visibility` back in `workshop.json`) after the user confirms.
 7. **Commit** the `workshop/` folder with the new `publishedFileId` (only the `workshop/` paths of that item). Never commit `.build/`.
 8. **Report** what was verified: the item id and URL, the visibility Steam returned, which languages were sent, and whether the item was seen as owner or anonymously.
@@ -97,17 +120,17 @@ A Workshop item has four kinds of pictures. Only the first three go to Steam thr
 | Picture | Where it lives | How it is sent |
 | --- | --- | --- |
 | Main preview (the image in the Mods list and on the item page) | `workshop/preview.png` (`previewPath`) | `upload --yes`, with the content |
-| Extra screenshots (Steam "additional previews", shown on the item page) | `workshop/<dir>/*.png` listed in `screenshots` | `images upload --yes` to add, `images remove --yes` to remove; a separate update each time |
+| Extra screenshots (Steam "additional previews", shown on the item page) | `workshop/<dir>/*.png` listed in `screenshots` | `images upload --yes` to add, `images remove --yes` to remove (both need `WORKSHOP_WRITE_CONFIRMED=1`); a separate update each time |
 | Images inside the game folder | the project's `contentPath` | `upload --yes`; players download them with the mod |
 | Steam video previews (YouTube links) | `videos` in `workshop.json` (a record, not a sender) | **Not sent by this skill.** Added by hand on the item page; `videos list` shows what is recorded and, with `--remote`, what Steam shows |
 
-Main preview only: when just the preview image changes (a redrawn picture, or an animated GIF in place of a PNG), use `preview`, not `upload`. `upload` always sends the content folder, the descriptions, the tags and the visibility with it, so a preview refresh would also push whatever is built and written locally to every subscriber. `preview` takes one item folder, `--app/--item/--file` for an item without a `workshop/` folder (for example a Duckov mod), or a `--manifest` JSON list of `{app, id, preview[, name]}` for many items at once; run it without `--yes` first, then with `--check`, then with `--yes`. The default change note is the bilingual `中文：预览图已更新。 / English: The preview was updated.`; pass `--changenote` for another one.
+Main preview only: when just the preview image changes (a redrawn picture, or an animated GIF in place of a PNG), use `preview`, not `upload`. `upload` always sends the content folder, the descriptions, the tags and the visibility with it, so a preview refresh would also push whatever is built and written locally to every subscriber. The order is: `preview <item-dir>` (dry run), `preview <item-dir> --check` (reads the item from Steam), then `preview <item-dir> --yes` with `WORKSHOP_WRITE_CONFIRMED=1` after the user confirms. `--manifest` takes a JSON list of `{app, id, preview[, name]}` for many items at once and follows the same order. The default change note is the bilingual `中文：预览图已更新。 / English: The preview was updated.`; pass `--changenote` for another one.
 
-Screenshots: `images list` first (read-only) to see what Steam has. `images upload` adds only the listed files Steam does not list yet, matched by file name, so running it twice adds nothing the second time. Steam keeps the file names; two screenshots with the same name are refused by `check`. To remove one, run `images remove <item-dir> <file-name>` first (a dry run prints the plan), then `--yes` after the user confirms the item and the names. It needs steamworks.js 0.1.5 or later. Steam offers no call to reorder screenshots. The removed name is also dropped from `screenshots` in `workshop.json`; without that step the next `images upload --yes` would add the file back.
+Screenshots: `images list` first (read-only) to see what Steam has. `images upload` adds only the listed files Steam does not list yet, matched by file name, so running it twice adds nothing the second time. Steam keeps the file names; two screenshots with the same name are refused by `check`. To remove one, run `images remove <item-dir> <file-name>` first (a dry run prints the plan), then `--yes` with `WORKSHOP_WRITE_CONFIRMED=1` after the user confirms the item and the names. It needs steamworks.js 0.1.5 or later. Steam offers no call to reorder screenshots. The removed name is also dropped from `screenshots` in `workshop.json`; without that step the next `images upload --yes` would add the file back.
 
 ## Videos
 
-Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@hagicode/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video (a separate demo-video skill's `references/mod-video.md`, which is not part of this repository), upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
+Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@hagicode/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video with any video tool, upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
 
 ```json
 "videos": [ { "youtubeId": "dQw4w9WgXcQ", "title": "Demo (English)" } ]
@@ -117,6 +140,7 @@ Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build
 
 ## Rules and traps
 
+- **Confirmed writes.** Every `--yes` that writes to Steam (`upload`, `preview`, `images upload`, `images remove`) is refused unless `WORKSHOP_WRITE_CONFIRMED=1` is set, and the caller sets it only after the user has confirmed the dry run. This stops accidents; it does not check who set the variable. Do not set it to skip the confirmation, and do not publish from a shell by any other route.
 - **Keep the id.** `upload` saves `publishedFileId` as soon as Steam creates the item, before the content upload. If the upload then fails (for example `there isn't a network connection to steam`), the item exists: run the same command again, which updates it. Never clear the id, and never create a second item to "fix" a failure. Confirm the stored id with `status --remote` first if in doubt.
 - **Tags are per game.** The same tag name can be missing for one game and present for another. `check` refuses a tag the item's game does not declare and an item with no `tags` key, before anything is sent. The dry run of `upload` prints the tags it would send. An item that already exists on Steam keeps its old tags until an `upload --yes` sends a `tags` list.
 - **Agreement.** If Steam reports `NEEDS_AGREEMENT`, the item stays hidden until the account accepts the Workshop legal agreement on the Steam website. Tell the user; do not try to work around it.
