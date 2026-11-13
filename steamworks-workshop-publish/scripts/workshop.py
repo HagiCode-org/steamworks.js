@@ -12,7 +12,8 @@
     workshop.py images remove <item-dir> <file-name>... [--yes]
 
 <item-dir> is the folder that owns the item (for a mod: its own folder). Its metadata lives in <item-dir>/workshop/
-(see references/item-layout.md). Nothing is submitted to Steam unless `upload` gets --yes.
+(see references/item-layout.md). Nothing is submitted to Steam unless a command gets --yes, and every --yes write also needs
+WORKSHOP_WRITE_CONFIRMED=1, set by the caller after the dry run was confirmed (see SKILL.md, Confirmed writes).
 
 The publishedFileId in workshop/workshop.json is written by `upload` only, and only once: from "0" to the id Steam
 returns for a new item. After that every upload updates that item. Never edit or clear it by hand.
@@ -20,7 +21,8 @@ returns for a new item. After that every upload updates that item. Never edit or
 Only English (`english`) and Simplified Chinese (`schinese`) are uploaded. Every other language in workshop.json is skipped
 with a `skip:` line and is never sent. `titles` (optional) holds the two title segments; the title Steam stores for each
 language is composed from them (locales.py). `upload` is the one route to Steam: steam-workshop.mjs is its engine and is
-not run by hand for publishing.
+not run by hand for publishing: run the dry run first, show the plan, and run `upload --yes` with WORKSHOP_WRITE_CONFIRMED=1
+only after the user confirms it.
 
 Every upload carries a change note: two lines, "中文：..." then "English: ..." (locales.py). It is required in
 workshop.json ("changeNote") and checked by `check`, `pack` and `upload`; `--changenote` must pass the same rule.
@@ -51,6 +53,17 @@ import workshop_tags  # the tags Steam declares per AppID; sits next to this fil
 SCHEMA = 1
 VISIBILITY = {"public": 0, "friends": 1, "hidden": 2, "unlisted": 3}  # hidden = Steam "Private"
 DEFAULT_VISIBILITY = "public"  # every new item is public unless the user asks for a private test
+# Every write to Steam with --yes (upload, preview, images upload, images remove) also needs CONFIRM_ENV=1. The caller sets
+# it only after the dry run was shown to the user and the user confirmed the plan (see SKILL.md, Confirmed writes).
+# The script cannot check who set it: this is a guard against accidental writes, not an authorization check.
+CONFIRM_ENV = "WORKSHOP_WRITE_CONFIRMED"
+
+
+def require_confirmed_write(command: str) -> None:
+    """Refuse a write to Steam unless the caller has set CONFIRM_ENV=1. Called before anything is read or staged."""
+    if os.environ.get(CONFIRM_ENV) != "1":
+        raise Fail(f"{command} --yes needs {CONFIRM_ENV}=1, which the caller sets after the dry run and the user's "
+                   "confirmation (see SKILL.md, Confirmed writes). Nothing was sent.")
 # Steam limits. The title is counted in characters. The description is counted in UTF-8 BYTES: Steam refuses a
 # description over 8000 bytes with "a parameter is invalid" even when it is under 8000 characters (Cyrillic and CJK text
 # is 2-3 bytes per character), which was observed on a real upload (8727 bytes failed, 7309 bytes passed).
@@ -442,6 +455,8 @@ def cmd_pack(args) -> None:
 
 
 def cmd_upload(args) -> None:
+    if args.yes:
+        require_confirmed_write("upload")  # refused before anything is read or staged
     meta, p = load(args.item_dir)
     print_skips(meta)
     warnings, files = check_or_fail(meta, p)
@@ -580,6 +595,8 @@ def cmd_videos_list(args) -> None:
 
 
 def cmd_images_upload(args) -> None:
+    if args.yes:
+        require_confirmed_write("images upload")
     meta, p = load(args.item_dir)
     check_or_fail(meta, p)
     listed = meta.get("screenshots", [])
@@ -610,6 +627,8 @@ def cmd_images_upload(args) -> None:
 
 
 def cmd_images_remove(args) -> None:
+    if args.yes:
+        require_confirmed_write("images remove")
     meta, p = load(args.item_dir)
     check_or_fail(meta, p)
     names = [Path(n).name for n in args.names]
@@ -725,6 +744,8 @@ def verify_live_preview(url: str, file: Path) -> str:
 
 def cmd_preview(args) -> None:
     """Replace only the main preview of existing items. Unlike `upload`, this resends no content, title, description or tags."""
+    if args.yes:
+        require_confirmed_write("preview")
     note = args.changenote if args.changenote is not None else PREVIEW_NOTE
     problems = locales.change_note_problems(note)
     if problems:

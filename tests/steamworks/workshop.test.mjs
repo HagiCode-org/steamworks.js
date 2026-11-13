@@ -100,11 +100,16 @@ function fixture() {
 }
 
 function run(args, env = {}, f) {
+  // A --yes write needs WORKSHOP_WRITE_CONFIRMED=1, which a caller sets after the user confirms the dry run. The tests that
+  // send one act as that caller; the variable is cleared from the outer environment so each test decides it itself.
+  const base = { ...process.env };
+  delete base.WORKSHOP_WRITE_CONFIRMED;
+  const confirmed = args.includes('--yes') ? { WORKSHOP_WRITE_CONFIRMED: '1' } : {};
   const r = spawnSync('python3', [WORKSHOP, ...args], {
     encoding: 'utf8',
     env: {
-      ...process.env, STEAMWORKS_JS: f.fakeDir, FAKE_STEAM_LOG: f.log, FAKE_STEAM_STATE: f.state,
-      WORKSHOP_TAGS_FILE: f.tagsFile, XDG_CACHE_HOME: path.join(f.base, 'cache'), ...env,
+      ...base, STEAMWORKS_JS: f.fakeDir, FAKE_STEAM_LOG: f.log, FAKE_STEAM_STATE: f.state,
+      WORKSHOP_TAGS_FILE: f.tagsFile, XDG_CACHE_HOME: path.join(f.base, 'cache'), ...confirmed, ...env,
     },
   });
   return { code: r.status, out: r.stdout, err: r.stderr, text: r.stdout + r.stderr };
@@ -305,7 +310,7 @@ test('upload fails clearly when steamworks.js is neither configured nor installe
   fs.symlinkSync(process.execPath, path.join(bin, 'node'));
   const python = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).stdout.trim();
   fs.symlinkSync(python, path.join(bin, 'python3'));
-  const env = { ...process.env, PATH: bin, FAKE_STEAM_LOG: f.log };
+  const env = { ...process.env, PATH: bin, FAKE_STEAM_LOG: f.log, WORKSHOP_WRITE_CONFIRMED: '1' };
   delete env.STEAMWORKS_JS;
   const r = spawnSync('python3', [WORKSHOP, 'upload', f.item, '--yes'], { encoding: 'utf8', env });
   assert.equal(r.status, 1);
@@ -319,6 +324,27 @@ test('the shipped skill has no project data and no hard-coded user paths', () =>
     const text = fs.readFileSync(path.join(PUBLISH, file), 'utf8');
     assert.doesNotMatch(text, /\/home\/[^/\s'"]+\/|Stonlen|Probably Stolen|ducky-cli/i, `${file} must stay generic`);
   }
+});
+
+test('every --yes write to Steam is refused without WORKSHOP_WRITE_CONFIRMED=1, before anything is read; dry runs need no variable', { skip }, () => {
+  const f = fixture();
+  run(['init', f.item, '--app-id', '4348910', '--languages', 'english'], {}, f);
+  fillIn(f);
+  setRemoteId(f);
+  const unconfirmed = { WORKSHOP_WRITE_CONFIRMED: '' };
+  for (const args of [
+    ['upload', f.item, '--yes'],
+    ['preview', f.item, '--yes'],
+    ['images', 'upload', f.item, '--yes'],
+    ['images', 'remove', f.item, 'shot1.png', '--yes'],
+  ]) {
+    const r = run(args, unconfirmed, f);
+    assert.equal(r.code, 1, `${args.join(' ')}: ${r.text}`);
+    assert.match(r.text, /WORKSHOP_WRITE_CONFIRMED=1/, args.join(' '));
+  }
+  assert.equal(calls(f).length, 0, 'nothing reached Steam');
+  assert.equal(run(['upload', f.item], unconfirmed, f).code, 0);
+  assert.equal(run(['preview', f.item], unconfirmed, f).code, 0);
 });
 
 const setRemoteId = (f) => {
