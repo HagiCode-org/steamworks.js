@@ -64,9 +64,10 @@ def require_confirmed_write(command: str) -> None:
     if os.environ.get(CONFIRM_ENV) != "1":
         raise Fail(f"{command} --yes needs {CONFIRM_ENV}=1, which the caller sets after the dry run and the user's "
                    "confirmation (see SKILL.md, Confirmed writes). Nothing was sent.")
-# Steam limits. The title is counted in characters. The description is counted in UTF-8 BYTES: Steam refuses a
-# description over 8000 bytes with "a parameter is invalid" even when it is under 8000 characters (Cyrillic and CJK text
-# is 2-3 bytes per character), which was observed on a real upload (8727 bytes failed, 7309 bytes passed).
+# Steam limits. Both the title and the description are counted in UTF-8 BYTES, not characters: Cyrillic and CJK text is
+# 2-3 bytes per character. A description over 8000 bytes fails with "a parameter is invalid" even when it is under 8000
+# characters (observed: 8727 bytes failed, 7309 bytes passed). A title is limited to 128 bytes the same way (observed on
+# Probably Stolen: 125 bytes accepted, 129 bytes cut to 128 with a broken character, 134 bytes refused).
 MAX_TITLE, MAX_DESCRIPTION, PREVIEW_WARN = 128, 8000, 1024 * 1024
 STEAM_SCRIPT = Path(__file__).resolve().with_name("steam-workshop.mjs")
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
@@ -255,9 +256,10 @@ def validate(meta: dict, p: dict[str, Path], declared: list[str] | None = None) 
             errors.append(f"languages.{key}.title is empty")
         elif PLACEHOLDER.search(title):
             errors.append(f"languages.{key}.title is still a placeholder")
-        elif len(title) > MAX_TITLE:
+        elif len(title.encode("utf-8")) > MAX_TITLE:
             what = "composed title" if segments else "title"
-            errors.append(f"languages.{key}: the {what} is {len(title)} characters; Steam accepts at most {MAX_TITLE}")
+            size = len(title.encode("utf-8"))
+            errors.append(f"languages.{key}: the {what} is {size} bytes of UTF-8; Steam accepts at most {MAX_TITLE} bytes")
         name = entry.get("description")
         if not isinstance(name, str) or not name:
             errors.append(f"languages.{key}.description must name a file under workshop/")

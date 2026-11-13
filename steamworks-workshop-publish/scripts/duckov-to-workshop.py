@@ -32,7 +32,7 @@ from pathlib import Path
 import locales  # the english / schinese scope, shared with workshop.py; sits next to this file
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
-MAX_TITLE, MAX_DESCRIPTION = 128, 8000  # kept in step with workshop.py
+MAX_TITLE, MAX_DESCRIPTION = 128, 8000  # kept in step with workshop.py; both are UTF-8 bytes
 
 
 def md_to_bbcode(md: str) -> str:
@@ -154,8 +154,8 @@ def main() -> None:
         if not title:
             problems.append(f"{md_path.name} has no '# ' heading, so it has no Steam title")
             continue
-        if len(title) > MAX_TITLE:
-            problems.append(f"{md_path.name}: title is {len(title)} characters, over {MAX_TITLE}")
+        if len(title.encode("utf-8")) > MAX_TITLE:
+            problems.append(f"{md_path.name}: title is {len(title.encode('utf-8'))} bytes of UTF-8, over {MAX_TITLE} bytes")
         body = md_to_bbcode(md)
         size = len(body.encode("utf-8"))
         if size > MAX_DESCRIPTION:
