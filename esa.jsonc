@@ -1,0 +1,8 @@
+{
+  "name": "steamworks-docs",
+  "installCommand": "echo nice",
+  "buildCommand": "echo nice",
+  "assets": {
+    "directory": "./dist"
+  }
+}

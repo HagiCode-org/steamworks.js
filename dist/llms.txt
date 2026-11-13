@@ -1,0 +1,25 @@
+# steamworks.js
+
+> Node.js and Electron bindings for the Steamworks SDK, for Steam Workshop, achievements, stats, cloud, overlay and networking.
+
+## Overview
+
+- [steamworks.js](https://steamworks.hagicode.com/): Node.js and Electron bindings for the Steamworks SDK, for Steam Workshop, achievements, stats, cloud, overlay and networking.
+
+## Guide
+
+- [Building and contributing](https://steamworks.hagicode.com/guide/building/): Build steamworks.js from source and contribute changes.
+- [Getting started](https://steamworks.hagicode.com/guide/getting-started/): Install steamworks.js and use its API, including the Electron setup.
+- [Networking and more](https://steamworks.hagicode.com/guide/networking/): Networking, the server browser, timeline, screenshots, remote play and supplemental functions.
+- [Release process](https://steamworks.hagicode.com/guide/releases/): How steamworks.js releases are drafted and published.
+- [Friends, stats and achievements](https://steamworks.hagicode.com/guide/social-and-stats/): Friends, stats, achievements and leaderboards.
+- [Steam Workshop](https://steamworks.hagicode.com/guide/workshop/): Screenshots, previews, content updates, item dependencies, known game versions and multilingual items.
+
+## Skills
+
+- [steamworks-js](https://steamworks.hagicode.com/skills/steamworks-js/): Route work that uses the steamworks.js Node binding to the Steam Workshop/UGC sub-skills. Covers Node and steamworks.js environment checks, Steam client initialization, AppID confirmation, callbacks and error handling, and choosing the right steamworks-* skill. Use for Steamworks / steamworks.js / Steam API / Steam 客户端 / AppID / 创意工坊 / Workshop / UGC / 订阅 / Steam 回调 questions or code.
+- [steamworks-workshop-client-state](https://steamworks.hagicode.com/skills/steamworks-workshop-client-state/): Manage the local Steam Workshop client state with steamworks.js: subscribed items, subscribe and unsubscribe, download and download progress, install location and info, and item state flags. Use for 已订阅列表 / 订阅 / 取消订阅 / 下载 / 安装位置 / 项目状态 / getSubscribedItems / subscribe / unsubscribe / download / installInfo / state. Subscribe, unsubscribe and download change account or local state, so they need confirmation. Requires the steamworks-js setup first.
+- [steamworks-workshop-publish](https://steamworks.hagicode.com/skills/steamworks-workshop-publish/): Publish a new Steam Workshop item or update one with steamworks.js, through the running Steam client without a password. Provides the shared scripts (workshop.py init/check/pack/upload/status and steam-workshop.mjs) and the per-item storage layout (workshop/workshop.json, descriptions, preview, publishedFileId). Items default to public; a private (hidden) test upload is optional. Covers per-language titles and descriptions, tags, extra screenshots (list and add), replacing only the main preview (`workshop.py preview`, animated GIF allowed), the Workshop legal agreement, and the item id that must be kept. Use for 创意工坊 发布 / 首次上传 / 预览图 / 标题描述 / 更新说明 (变更说明, bilingual, required) / 可见性 / 协议提示 / publishedFileId / workshop.json / createItem. Submits remote content; needs explicit confirmation. Every write to Steam (upload, preview, images upload, images remove) needs a confirmed dry run first: the write runs with WORKSHOP_WRITE_CONFIRMED=1 (see Confirmed writes). Requires the steamworks-js setup first.
+- [steamworks-workshop-query](https://steamworks.hagicode.com/skills/steamworks-workshop-query/): Read-only Steam Workshop/UGC queries with steamworks.js: remote item lists, search, tag filtering, single and batch item details, a user's published items, and paging. Use for Workshop 列表 / 搜索 / 标签筛选 / 项目详情 / 用户作品 / 分页 / getAllItems / getUserItems / getItem / getItems questions. Requires the steamworks-js setup first.
+- [steamworks-workshop-stats](https://steamworks.hagicode.com/skills/steamworks-workshop-stats/): Steam Workshop statistics report for each mod this Steam account published under given games: one row per mod with its current subscriber and favorite counts and its change against the previous saved day, kept in the user's cache directory. Defaults to Escape from Duckov (3167020) and Probably Stolen (4348910). Use for 创意工坊 数据 / 订阅量 / 收藏量 / 报表 / 每日变化 / 已发布模组 / Workshop stats / subscriptions / favorites questions. Requires the steamworks-js setup first.
+- [steamworks-workshop-update](https://steamworks.hagicode.com/skills/steamworks-workshop-update/): Update an existing Steam Workshop item with steamworks.js: change note, new content or preview, metadata changes, upload progress, and result checks, using the shared workshop.py upload from steamworks-workshop-publish. Use for 更新创意工坊项目 / 变更说明 / 上传进度 / publishedFileId / updateItem / 提交前核对 AppID 和项目 ID. Submits remote content; requires explicit confirmation of the target item and its content. Requires the steamworks-js setup first.
