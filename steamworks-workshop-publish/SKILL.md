@@ -23,7 +23,7 @@ exit code stays 0. A skipped language is never sent, and text that already exist
 
 Titles can be composed from two segments in the optional `titles` object (`"en"` and `"zh-CN"`). The Chinese entry reads
 Chinese first, then English; the English entry reads English first, then Chinese; the separator is ` | ` (defined once in
-`scripts/locales.py`). A composed title is at most 128 characters and is checked before anything is staged. Without `titles`,
+`scripts/locales.py`). A composed title is at most 128 UTF-8 bytes (Chinese and full-width characters take 3 bytes each) and is checked before anything is staged. Without `titles`,
 each stored title is uploaded unchanged. The composition happens in memory: `workshop.json` is never rewritten.
 
 `workshop.py upload` is the single route to Steam. `check`, `pack`, and the dry-run `upload` (read the `skip:` lines and the
@@ -148,7 +148,7 @@ Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build
 - **A failed language leaves a partial update.** `upload --yes` sends the primary language with the content first, then each other language in turn. When one language is refused, the content and the languages before it have already changed on Steam, and the rest still show the old text. Fix the text, then run the same `upload --yes` again: the item is updated, not recreated. Do not treat a partially updated item as published.
 - **`contentPath` is a build output, not a source folder.** A path in a scratch folder is not committed, so rebuild before each upload. The scripts refuse a missing folder but cannot tell whether it is the current build: rebuild, then `check`.
 - **Preview only.** The Steamworks binding accepts a `previewPath` on its own, but no script here exposes that. Updating only the preview is therefore done with a full `upload --yes` (content and descriptions are sent again). A preview-only command is not implemented.
-- **Titles** are counted in characters (`128`), and the composed title is what is counted when `titles` is set. This is not verified against Steam's byte count; the Duckov titles are far below the limit.
+- **Titles** are counted in UTF-8 bytes (`128`), like descriptions, and the composed title is what is counted when `titles` is set. Observed on Steam: 125 bytes accepted, 129 bytes truncated, 134 bytes refused.
 - **Descriptions are never mixed.** Each player sees the description in their own language and falls back to the primary one. Put one language per description file, never two in one. Titles are the exception: a composed title carries both segments on purpose (see above).
 - **Anonymous checks.** Steam answers repeated anonymous requests to an item page with HTTP 429. Do not loop; check later or in a logged-in browser.
 - **Steam credentials.** Never ask for, print or store a password. The scripts use the running client only. `steamcmd` (password and Steam Guard) is not used here; if the user wants it, they run it in their own terminal.
