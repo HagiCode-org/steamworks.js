@@ -10,3 +10,6 @@ sdk/*
 __pycache__/
 # Local gh-pages payload staged by docs/scripts/stage-payload.mjs
 /.deploy/
+
+# Local deja session-rule export (auto-extracted from agent sessions; not committed)
+.deja/
