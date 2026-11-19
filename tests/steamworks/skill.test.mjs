@@ -90,3 +90,15 @@ test('the AGENTS.md skill index lists every steamworks skill and its link', () =
     assert.ok(index.includes(`[\`${skill}\`](${skill}/SKILL.md)`), `AGENTS.md must list ${skill}`);
   }
 });
+
+test('the update skill documents the required-item calls and the router, query and publish skills point to them', () => {
+  const skill = (name) => read(`${name}/SKILL.md`);
+  const update = skill('steamworks-workshop-update');
+  for (const word of ['addDependency', 'removeDependency', 'returnChildren', 'resolved number, not a rejection', 'Read back']) {
+    assert.ok(update.includes(word), `update skill mentions ${word}`);
+  }
+  assert.ok(!/Dependencies and votes/.test(update), 'the stale "dependencies are not exposed" line is gone');
+  assert.match(skill('steamworks-js'), /addDependency[\s\S]*steamworks-workshop-update/);
+  assert.match(skill('steamworks-workshop-query'), /`returnChildren: true` fills `children`/);
+  assert.match(skill('steamworks-workshop-publish'), /Dependencies are not part of `upload`/);
+});

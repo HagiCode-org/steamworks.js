@@ -18,6 +18,7 @@ Read-only. Nothing here changes the account, the Workshop, or local files. Compl
 
 Useful fields on `WorkshopItemQueryConfig`: `requiredTags`, `excludedTags`, `matchAnyTag`, `searchText`, `rankedByTrendDays`, `language`, `includeMetadata`, `includeLongDescription`, `includeAdditionalPreviews`, `onlyIds`, `onlyTotal`, `cachedResponseMaxAge`, `returnChildren`.
 
+- `returnChildren: true` fills `children` (the ids of the item's required items, `bigint`) and `numChildren` is the count; without it `children` is absent. This is how the current dependencies of an item are read; changing them belongs to [`steamworks-workshop-update`](../steamworks-workshop-update/SKILL.md).
 - Use `onlyTotal` or `onlyIds` when you only need counts or ids; they are cheaper.
 - Paginated results carry `returnedResults`, `totalResults` and `wasCached`. Loop pages until the collected count reaches `totalResults` or a page returns no items.
 

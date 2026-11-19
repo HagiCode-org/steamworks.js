@@ -32,6 +32,7 @@ This skill owns the shared setup for every `steamworks-*` skill. It does not car
 | Lists, search, tags, item details, user lists, paging | [`steamworks-workshop-query`](../steamworks-workshop-query/SKILL.md) | Read-only |
 | Create an item, first upload of content and preview, set title/description/tags/visibility; shared `workshop.py` and per-item `workshop/` layout | [`steamworks-workshop-publish`](../steamworks-workshop-publish/SKILL.md) | Submits remote content |
 | Change an existing item, change note, upload progress and result check | [`steamworks-workshop-update`](../steamworks-workshop-update/SKILL.md) | Submits remote content |
+| Required items (dependencies) between Workshop items: read the links (`returnChildren`), add or remove them (`addDependency`, `removeDependency`) | [`steamworks-workshop-update`](../steamworks-workshop-update/SKILL.md) | Submits remote content: changes what subscribers of the item install |
 | Subscribe, unsubscribe, download, install location, item state | [`steamworks-workshop-client-state`](../steamworks-workshop-client-state/SKILL.md) | Changes account subscriptions or local files |
 | Report of our published mods per game: one row per mod with subscriptions and favorites, change against the previous saved day in the user's cache directory | [`steamworks-workshop-stats`](../steamworks-workshop-stats/SKILL.md) | Read-only for Steam; writes its own daily cache files |
 
