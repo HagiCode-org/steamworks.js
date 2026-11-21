@@ -3,3 +3,4 @@ dist/
 .astro/
 .deploy/
 src/content/docs/generated/
+src/content/docs/api/
