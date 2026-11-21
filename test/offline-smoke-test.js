@@ -190,6 +190,37 @@ async function checkWorkshopPathValidation() {
     await assert.rejects(nativeBinding.workshop.updateItemContent(1n, __filename), /is not a folder/, 'a file is not a content folder')
 }
 
-checkWorkshopPathValidation().then(() => {
+// The calls added for user actions, app dependencies, file types and the new update fields. Each checks its arguments
+// before any Steam call, so a bad argument rejects here without a client.
+function checkWorkshopNewExports() {
+    for (const name of [
+        'createItem',
+        'updateItem',
+        'setUserItemVote',
+        'getUserItemVote',
+        'addItemToFavorites',
+        'removeItemFromFavorites',
+        'startPlaytimeTracking',
+        'stopPlaytimeTracking',
+        'addAppDependency',
+        'removeAppDependency',
+        'getAppDependencies',
+    ]) {
+        assert.equal(typeof nativeBinding.workshop[name], 'function', `workshop.${name} is exported`)
+    }
+}
+
+async function checkWorkshopNewArgumentValidation() {
+    const workshop = nativeBinding.workshop
+    await assert.rejects(workshop.updateItem(1n, { additionalPreviewVideos: ['dQw4w9WgXc'] }), /not an 11-character YouTube video ID/, 'a short video id rejects before submission')
+    await assert.rejects(workshop.updateItem(1n, { metadata: 'a\0b' }), /NUL character/, 'metadata with a NUL byte rejects')
+    await assert.rejects(workshop.startPlaytimeTracking([]), /at least one Workshop item/, 'playtime tracking needs an item')
+    await assert.rejects(workshop.stopPlaytimeTracking([0n]), /item 0/, 'item 0 is refused for playtime tracking')
+    await assert.rejects(workshop.getUserItemVote(-1n), /non-negative integer/, 'a negative item id is refused')
+    await assert.rejects(workshop.getAppDependencies(-1n), /non-negative integer/, 'a negative item id is refused for app dependencies')
+}
+
+checkWorkshopNewExports()
+checkWorkshopPathValidation().then(checkWorkshopNewArgumentValidation).then(() => {
     console.log('offline smoke test passed (workshop, friends, stats, achievement, leaderboard, callback, networking, matchmaking servers, screenshots, timeline, remote play and supplemental exports are present)')
 })

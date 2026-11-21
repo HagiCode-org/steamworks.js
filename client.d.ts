@@ -890,6 +890,43 @@ export declare namespace workshop {
     Private = 2,
     Unlisted = 3
   }
+  /** Workshop file types for `createItem`. Omitting the argument keeps `Community`. */
+  export const enum WorkshopFileType {
+    Community = 0,
+    Art = 1,
+    Screenshot = 2,
+    Video = 3,
+    Collection = 4,
+    WebGuide = 5,
+    IntegratedGuide = 6
+  }
+  /** Steam's community content descriptors. The values are the SDK's own IDs. */
+  export const enum WorkshopContentDescriptor {
+    NudityOrSexualContent = 1,
+    FrequentViolenceOrGore = 2,
+    AdultOnlySexualContent = 3,
+    GratuitousSexualContent = 4,
+    AnyMatureContent = 5
+  }
+  /** One key-value tag, stored on the item as `key=value`. */
+  export interface KeyValueTag {
+    key: string
+    value: string
+  }
+  /** Key-value tag changes. They are applied in the order clear, remove, add. */
+  export interface KeyValueTagsUpdate {
+    /** Removes every key-value tag of the item first. */
+    clear?: boolean
+    /** Keys whose values are all removed. */
+    remove?: Array<string>
+    /** Pairs added after the removals. */
+    add?: Array<KeyValueTag>
+  }
+  /** Content descriptor changes. Removals are applied before additions. */
+  export interface ContentDescriptorsUpdate {
+    remove?: Array<WorkshopContentDescriptor>
+    add?: Array<WorkshopContentDescriptor>
+  }
   export interface UgcUpdate {
     title?: string
     description?: string
@@ -912,6 +949,14 @@ export declare namespace workshop {
     requiredGameVersionMin?: string
     /** Newest game version (Steam branch) the item is valid for; see `requiredGameVersionMin`. */
     requiredGameVersionMax?: string
+    /** YouTube video IDs (11 characters each) added as video previews. Checked before submission. */
+    additionalPreviewVideos?: Array<string>
+    /** Developer metadata set on the item. Left unchanged when omitted. */
+    metadata?: string
+    /** Key-value tag changes, applied in the order clear, remove, add. */
+    keyValueTags?: KeyValueTagsUpdate
+    /** Content descriptor changes, applied as removals then additions. */
+    contentDescriptors?: ContentDescriptorsUpdate
   }
   export interface InstallInfo {
     folder: string
@@ -935,7 +980,13 @@ export declare namespace workshop {
     progress: bigint
     total: bigint
   }
-  export function createItem(appId?: number | undefined | null): Promise<UgcResult>
+  /**
+   * Creates an empty Workshop item. The file type defaults to `Community`; `Art` creates an Artwork item.
+   *
+   * @param appId - defaults to the app id the client was initialized with
+   * @param fileType - the Workshop file type; omitted keeps `Community`
+   */
+  export function createItem(appId?: number | undefined | null, fileType?: WorkshopFileType | undefined | null): Promise<UgcResult>
   export function updateItem(itemId: bigint, updateDetails: UgcUpdate, appId?: number | undefined | null): Promise<UgcResult>
   /**
    * Replace only the main preview image of a Workshop item.
@@ -1026,6 +1077,89 @@ export declare namespace workshop {
    * code (`1` is OK), with the same validation and rejection rules as `addDependency`.
    */
   export function removeDependency(parentId: bigint, childId: bigint): Promise<number>
+  /** The user's vote on a Workshop item, as Steam reports it. */
+  export interface UserItemVoteState {
+    votedUp: boolean
+    votedDown: boolean
+    /** The user has neither voted up nor down. */
+    skipped: boolean
+  }
+  /**
+   * The app dependencies of a Workshop item. When `appIds` is shorter than
+   * `totalAppDependencies`, the list is incomplete.
+   */
+  export interface AppDependencies {
+    /** Steam result code; `1` is OK. */
+    result: number
+    appIds: Array<number>
+    totalAppDependencies: number
+  }
+  /**
+   * Votes for (`voteUp` true) or against a Workshop item as the current user.
+   *
+   * **Changes the user's vote on Steam.** Resolves when Steam confirms the vote.
+   *
+   * @param itemId - the Workshop item
+   * @param voteUp - true to vote up, false to vote down
+   */
+  export function setUserItemVote(itemId: bigint, voteUp: boolean): Promise<void>
+  /** Reads the current user's vote on a Workshop item. Read-only. */
+  export function getUserItemVote(itemId: bigint): Promise<UserItemVoteState>
+  /**
+   * Adds a Workshop item to the current user's favorites.
+   *
+   * **Changes the user's favorites on Steam.**
+   *
+   * @param itemId - the Workshop item
+   * @param appId - defaults to the app id the client was initialized with
+   */
+  export function addItemToFavorites(itemId: bigint, appId?: number | undefined | null): Promise<void>
+  /**
+   * Removes a Workshop item from the current user's favorites.
+   *
+   * **Changes the user's favorites on Steam.**
+   *
+   * @param itemId - the Workshop item
+   * @param appId - defaults to the app id the client was initialized with
+   */
+  export function removeItemFromFavorites(itemId: bigint, appId?: number | undefined | null): Promise<void>
+  /**
+   * Starts playtime tracking for Workshop items. The list must not be empty.
+   *
+   * **Changes the user's playtime records on Steam.**
+   *
+   * @param itemIds - the Workshop items
+   */
+  export function startPlaytimeTracking(itemIds: Array<bigint>): Promise<void>
+  /**
+   * Stops playtime tracking for Workshop items. The list must not be empty.
+   *
+   * **Changes the user's playtime records on Steam.**
+   *
+   * @param itemIds - the Workshop items
+   */
+  export function stopPlaytimeTracking(itemIds: Array<bigint>): Promise<void>
+  /**
+   * Adds `appId` as an app dependency of a Workshop item (for example a DLC the item needs).
+   * Resolves with the Steam result code, where `1` is OK. A non-OK code resolves rather than rejects.
+   *
+   * **Changes the item's remote state.**
+   */
+  export function addAppDependency(itemId: bigint, appId: number): Promise<number>
+  /**
+   * Removes `appId` from the app dependencies of a Workshop item. Resolves with the Steam result code
+   * (`1` is OK), with the same rules as `addAppDependency`.
+   *
+   * **Changes the item's remote state.**
+   */
+  export function removeAppDependency(itemId: bigint, appId: number): Promise<number>
+  /**
+   * Reads every app dependency of a Workshop item. Steam sends them in pages; they are collected
+   * until the reported total is reached. Read-only.
+   *
+   * Not verified against a live Steam client: see the paging note in steamworks-rs.
+   */
+  export function getAppDependencies(itemId: bigint): Promise<AppDependencies>
   export const enum UGCQueryType {
     RankedByVote = 0,
     RankedByPublicationDate = 1,

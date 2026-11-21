@@ -5,7 +5,9 @@
 // schinese languages and refuses any other one before it contacts Steam.
 //
 //   node steam-workshop.mjs publish --app <AppID> --item <id|0> --content <dir> --preview <png> \
-//        --translations <json> [--tags a,b] [--visibility public|friends|hidden|unlisted] (default public) [--changenote <中文：…\nEnglish: …>]
+//        --translations <json> [--tags a,b] [--visibility public|friends|hidden|unlisted] (default public) [--changenote <中文：…\nEnglish: …>] \
+//        [--file-type community|art|screenshot|video|collection|web-guide|integrated-guide] (only with --item 0; default community) \
+//        [--videos <youtubeId>,<youtubeId>]
 //   node steam-workshop.mjs add-previews --app <AppID> --item <id> --files <json>   (json: array of absolute image paths)
 //   node steam-workshop.mjs remove-previews --app <AppID> --item <id> --indexes <json>   (json: array of 0-based indexes into additionalPreviews)
 //   node steam-workshop.mjs info --app <AppID> --item <id>
@@ -36,6 +38,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { createItemArgs, parseVideoIds, primaryUpdate, videosToSend } from './workshop-args.mjs';
 
 const VISIBILITY = { public: 0, friends: 1, hidden: 2, unlisted: 3 };
 const PREVIEW_TYPES = ['image', 'youtube', 'sketchfab', 'environment-horizontal-cross', 'environment-latlong', 'clip'];
@@ -127,6 +130,7 @@ async function readItem(itemId) {
   return {
     publishedFileId: info.publishedFileId,
     title: info.title,
+    previewUrl: info.previewUrl ?? null,
     visibility: Object.keys(VISIBILITY).find((k) => VISIBILITY[k] === info.visibility) ?? info.visibility,
     timeUpdated: info.timeUpdated,
     tags: info.tags,
@@ -247,11 +251,20 @@ if (command === 'info') {
   for (const p of [content, preview]) if (!existsSync(p)) fail(`${p} does not exist`);
 
   const [primary, ...others] = translations;
+  let createArgs;
+  let listedVideos;
+  try {
+    createArgs = createItemArgs(appId, opt('file-type'));
+    listedVideos = parseVideoIds(opt('videos'));
+  } catch (e) {
+    fail(e.message);
+  }
+  if (opt('file-type') !== undefined && item !== '0') fail('--file-type applies only when creating an item (--item 0)');
   let itemId;
   let agreement = false;
   try {
     if (item === '0') {
-      const created = await client.workshop.createItem(appId);
+      const created = await client.workshop.createItem(...createArgs);
       if (!created.itemId || created.itemId === 0n) fail('Steam did not create the item');
       itemId = created.itemId;
       agreement ||= Boolean(created.needsToAcceptAgreement);
@@ -260,7 +273,16 @@ if (command === 'info') {
       itemId = BigInt(item);
     }
 
-    const main = await submit(itemId, {
+    // A video already listed on the item is not sent again, so a repeated upload does not add it twice.
+    let videos = listedVideos;
+    if (listedVideos.length > 0 && item !== '0') {
+      const onSteam = (await readItem(itemId)).additionalPreviews
+        .filter((p) => p.previewType === 'youtube').map((p) => p.urlOrVideoId);
+      videos = videosToSend(listedVideos, onSteam);
+      for (const id of listedVideos.filter((v) => !videos.includes(v))) console.log(`VIDEO_PRESENT ${id}`);
+    }
+
+    const main = await submit(itemId, primaryUpdate({
       title: primary.title,
       description: primary.description,
       language: primary.language,
@@ -268,8 +290,10 @@ if (command === 'info') {
       previewPath: preview,
       contentPath: content,
       visibility: VISIBILITY[visibilityName],
-      ...(tags === undefined ? {} : { tags }),
-    }, `upload ${primary.language}`);
+      tags,
+      videos,
+    }), `upload ${primary.language}`);
+    for (const id of videos) console.log(`VIDEO_SUBMITTED ${id}`);
     agreement ||= main.agreement;
     console.log(`\nprimary language ${primary.language}: content, preview, title and description set`);
 

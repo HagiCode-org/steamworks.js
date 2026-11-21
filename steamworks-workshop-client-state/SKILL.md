@@ -1,6 +1,6 @@
 ---
 name: steamworks-workshop-client-state
-description: "Manage the local Steam Workshop client state with steamworks.js: subscribed items, subscribe and unsubscribe, download and download progress, install location and info, and item state flags. Use for 已订阅列表 / 订阅 / 取消订阅 / 下载 / 安装位置 / 项目状态 / getSubscribedItems / subscribe / unsubscribe / download / installInfo / state. Subscribe, unsubscribe and download change account or local state, so they need confirmation. Requires the steamworks-js setup first."
+description: "Manage the local Steam Workshop client state with steamworks.js: subscribed items, subscribe and unsubscribe, download and download progress, install location and info, item state flags, and the user's votes, favorites and playtime tracking. Use for 已订阅列表 / 订阅 / 取消订阅 / 下载 / 安装位置 / 项目状态 / 投票 / 收藏 / 游玩时长 / getSubscribedItems / subscribe / unsubscribe / download / installInfo / state / setUserItemVote / addItemToFavorites / startPlaytimeTracking. Subscribe, unsubscribe, download, vote, favorite and playtime tracking change account or local state, so they need confirmation. Requires the steamworks-js setup first."
 ---
 
 # steamworks-workshop-client-state
@@ -15,11 +15,17 @@ Complete the setup in [`steamworks-js`](../steamworks-js/SKILL.md) first. The St
 - `workshop.downloadInfo(itemId)`: progress of a pending download, or `null`.
 - `workshop.subscribe(itemId)` and `workshop.unsubscribe(itemId)`: both return promises.
 - `workshop.download(itemId, highPriority)`: returns `boolean`. High priority pauses other Steam downloads.
+- `workshop.setUserItemVote(itemId, voteUp)`: votes up (`true`) or down (`false`) as the logged-in user. Resolves when Steam confirms.
+- `workshop.getUserItemVote(itemId)`: read-only `{ votedUp, votedDown, skipped }` for the same user.
+- `workshop.addItemToFavorites(itemId, appId?)` and `workshop.removeItemFromFavorites(itemId, appId?)`: the user's favorites. `appId` defaults to the client's app.
+- `workshop.startPlaytimeTracking(itemIds)` and `workshop.stopPlaytimeTracking(itemIds)`: take a non-empty list of ids. Start and stop in pairs.
 
 ## Impact
 
 - **Read-only:** `getSubscribedItems`, `state`, `downloadInfo`. Run freely.
 - **Account state:** `subscribe` adds the item to the user's subscriptions. `unsubscribe` removes it, and per Steam's documentation the content is removed when the game quits. Show the id and wait for a go-ahead.
+- **Account state, public:** `setUserItemVote`, `addItemToFavorites`, `removeItemFromFavorites` change what the logged-in user has voted or favorited, and the item's public score or favorites count can move with it. Show the item, the vote or favorite change, and the account, then wait for a go-ahead. Read `getUserItemVote` first and report the current vote.
+- **Playtime tracking:** `startPlaytimeTracking` and `stopPlaytimeTracking` start and stop Steam counting the user's playing time against the listed items. The SDK header describes it; the exact effect is unverified against a live client, so say so. Never start tracking without a planned stop.
 - **Local files:** `download` fetches content to disk. `highPriority: true` also interrupts other Steam downloads, so only use it when the user asks.
 - **Used-items list:** Steam's documentation says `GetItemInstallInfo` records the item in the user's used list. This is not verified in this skill; check the Steamworks documentation before relying on it, and tell the user before reading install info for items they did not ask about.
 

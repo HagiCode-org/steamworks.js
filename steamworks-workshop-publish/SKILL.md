@@ -34,7 +34,7 @@ it contacts Steam, and it is not run by hand to publish.
 ## Confirmed writes
 
 Every command that writes to Steam takes `--yes` and needs `WORKSHOP_WRITE_CONFIRMED=1` in its environment: `upload`, `preview`
-(every mode), `images upload` and `images remove`. Without the variable, `--yes` is refused before anything is read or staged.
+(every mode), `images upload`, `images remove` and `artwork`. Without the variable, `--yes` is refused before anything is read or staged.
 Dry runs (no `--yes`) and the read-only commands (`check`, `pack`, `tags`, `status`, `images list`, `videos list`, `preview --check`)
 need no variable and send nothing.
 
@@ -91,16 +91,18 @@ Run from any directory; `<item-dir>` is the folder that owns the item.
 | `scripts/workshop.py tags <item-dir>` | Prints the Workshop tags Steam declares for the item's `appId`, and the item's own `tags`. | Read-only (public page) |
 | `scripts/workshop.py pack <item-dir>` | Runs `check`, then stages the included files and `translations.json` in `workshop/.build/`. | No |
 | `scripts/workshop.py upload <item-dir> [--visibility V] [--changenote T]` | Dry run: prints the plan, the `skip:` lines, the composed titles and the change note (`T` is the two-line bilingual note, see [Change note](#change-note-更新说明)). | No |
-| `scripts/workshop.py upload <item-dir> ... --yes` | Packs, then creates or updates the item; saves the new `publishedFileId` the moment Steam returns it. Needs `WORKSHOP_WRITE_CONFIRMED=1` (see [Confirmed writes](#confirmed-writes)). | **Yes**, with the variable |
+| `scripts/workshop.py upload <item-dir> ... --yes` | Packs, then creates or updates the item; saves the new `publishedFileId` the moment Steam returns it. Also sends the listed `videos` as additional preview videos, skipping any Steam already lists. Needs `WORKSHOP_WRITE_CONFIRMED=1` (see [Confirmed writes](#confirmed-writes)). | **Yes**, with the variable |
 | `scripts/workshop.py status <item-dir> [--remote]` | Shows the stored identity; `--remote` reads the item from Steam. | Read-only |
 | `scripts/workshop.py images list <item-dir>` | Lists the screenshots Steam has for the item and the ones listed in `workshop.json`. | Read-only |
 | `scripts/workshop.py images upload <item-dir> [--yes]` | Adds the listed screenshots that Steam does not have yet (matched by file name). Sends no content and changes no title. | Dry run; **Yes** with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1` |
 | `scripts/workshop.py preview <item-dir> [--file IMAGE] [--changenote T]` (or `--app N --item ID --file IMAGE`, or `--manifest FILE [--only IDS]`) | Dry run: prints which items get which preview file and the change note. `--check` reads each item from Steam (owner, app, current preview) and sends nothing. | Dry run; read-only with `--check` |
 | `scripts/workshop.py preview ... --yes` | Replaces **only the main preview** of existing items, in one update each. Sends no content, title, description, tags or visibility (`upload` resends all of them). Refuses an item the logged-in account does not own or that belongs to another app, reads the item back and fails if Steam still lists the old preview, then downloads the live preview and compares it with the local file. PNG, JPG or GIF (an animated GIF is allowed), at most 1,000,000 bytes. Needs `WORKSHOP_WRITE_CONFIRMED=1`. | **Yes**, with the variable |
 | `scripts/workshop.py videos list <item-dir> [--remote]` | Lists the `videos` in `workshop.json` with their YouTube links; with `--remote` also says which ones Steam shows and which Steam shows that are not listed. | Read-only |
+| `scripts/workshop.py artwork --app-id N --image FILE --title T [--description D] [--changenote T]` | Validation: prints the plan for one **private** Art item with that one image (a GIF tests animated acceptance). Sends nothing; the report marks every outcome unverified. See [Artwork validation](#artwork-validation). | Dry run |
+| `scripts/workshop.py artwork ... --yes` | Creates the private Art item, uploads the image, reads the item back and prints the outcome report. | **Yes**, with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1` |
 | `scripts/workshop.py images remove <item-dir> <file-name>... [--yes]` | Removes the named screenshots from the item on Steam, in one update. Each name must be on Steam now (`images list`); an unknown name stops the run. Changes no content or title. With `--yes`, also drops those entries from `screenshots` in `workshop.json`. | Dry run; **Yes** with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1` |
 
-Under the hood, `upload --yes` runs `scripts/steam-workshop.mjs publish`. It sends the item's `tags` every time (an empty list clears them), creates the item (only when `publishedFileId` is `"0"`), sends the primary language with the content and preview, and then sends each other language as a text-only update.
+Under the hood, `upload --yes` runs `scripts/steam-workshop.mjs publish`. It sends the item's `tags` every time (an empty list clears them), creates the item (only when `publishedFileId` is `"0"`), sends the primary language with the content and preview, adds the listed video ids as `additionalPreviewVideos` (skipping those Steam already lists), and then sends each other language as a text-only update. `artwork --yes` runs the same `publish` with `--item 0 --file-type art --visibility hidden`.
 
 ## Steps
 
@@ -122,7 +124,7 @@ A Workshop item has four kinds of pictures. Only the first three go to Steam thr
 | Main preview (the image in the Mods list and on the item page) | `workshop/preview.png` (`previewPath`) | `upload --yes`, with the content |
 | Extra screenshots (Steam "additional previews", shown on the item page) | `workshop/<dir>/*.png` listed in `screenshots` | `images upload --yes` to add, `images remove --yes` to remove (both need `WORKSHOP_WRITE_CONFIRMED=1`); a separate update each time |
 | Images inside the game folder | the project's `contentPath` | `upload --yes`; players download them with the mod |
-| Steam video previews (YouTube links) | `videos` in `workshop.json` (a record, not a sender) | **Not sent by this skill.** Added by hand on the item page; `videos list` shows what is recorded and, with `--remote`, what Steam shows |
+| Steam video previews (YouTube links) | `videos` in `workshop.json` | `upload --yes`, as additional preview videos; only the ids Steam does not list yet. Whether Steam shows them is **unverified** until a confirmed run (see [Videos](#videos)) |
 
 Main preview only: when just the preview image changes (a redrawn picture, or an animated GIF in place of a PNG), use `preview`, not `upload`. `upload` always sends the content folder, the descriptions, the tags and the visibility with it, so a preview refresh would also push whatever is built and written locally to every subscriber. The order is: `preview <item-dir>` (dry run), `preview <item-dir> --check` (reads the item from Steam), then `preview <item-dir> --yes` with `WORKSHOP_WRITE_CONFIRMED=1` after the user confirms. `--manifest` takes a JSON list of `{app, id, preview[, name]}` for many items at once and follows the same order. The default change note is the bilingual `中文：预览图已更新。 / English: The preview was updated.`; pass `--changenote` for another one.
 
@@ -130,13 +132,38 @@ Screenshots: `images list` first (read-only) to see what Steam has. `images uplo
 
 ## Videos
 
-Steam takes a Workshop video only as a **YouTube link**. The steamworks.js build in use (`@hagicode/steamworks.js` 0.1.5-dev.6) can read a video preview (`urlOrVideoId`, `previewType` `youtube`) but has no call to add one, so no script here sends a video. The flow is: make the video with any video tool, upload it to YouTube, add the link on the item page as the owner, then record it in `workshop.json`:
+Steam takes a Workshop video only as a **YouTube link**. The flow is: make the video with any video tool, upload it to YouTube, then record its id in `workshop.json`:
 
 ```json
 "videos": [ { "youtubeId": "dQw4w9WgXcQ", "title": "Demo (English)" } ]
 ```
 
-`check` validates the list (the 11-character id, not a URL; a title; no duplicates). `upload` prints that videos are not part of the upload. `videos list <item-dir> --remote` compares the list with what Steam shows (read-only).
+`check` validates the list (the 11-character id, not a URL; a title; no duplicates). `upload` prints the ids it sends as additional preview videos, and `upload --yes` sends each id Steam does not list yet. Sending them through steamworks.js needs the build with `additionalPreviewVideos` (the video-preview change); an older build ignores the field, and then the ids stay off Steam.
+
+**Unverified:** whether Steam shows a video sent this way. Until a confirmed run on a private test item records it, do not say that videos work. After an upload, run `videos list <item-dir> --remote` (read-only): a listed id marked `on Steam` is the evidence. If Steam does not show one, add that video by hand on the item page (Add/Edit videos) while signed in as the owner.
+
+## Artwork validation
+
+`artwork` checks whether Steam accepts an Artwork (Art) item and a GIF for this app. It is a validation run, not a publishing route. It creates one **private** item (visibility Private, file type Art), never a public one, and it does not write that item into any `workshop.json`.
+
+1. Dry run: `workshop.py artwork --app-id N --image FILE --title T`. It prints the app, the file type, the visibility, the image, the title and the change note. It sends nothing, and the report marks every outcome `unverified`.
+2. Show the plan to the user. After they confirm it, run the same command with `--yes` and `WORKSHOP_WRITE_CONFIRMED=1`. Pass exactly one image; use a GIF to test animated acceptance.
+3. Read the report. Each outcome is `verified`, `failed` or `unverified`, and a value is set only from what that run printed or read back.
+
+| Outcome | Verified when | Failed when | Otherwise |
+| --- | --- | --- | --- |
+| creation | Steam returns an item id for the Art item | Steam refuses the creation (its error is shown) | unverified |
+| upload | publish returns `DONE` | publish fails after the item exists | unverified |
+| community configuration | the Art creation succeeds, so this app accepts Artwork | not set `failed` by itself; a refused creation leaves this unverified, with the error under `creation` | unverified |
+| GIF accepted | a GIF upload is read back with a preview URL | the upload or the read-back gives no URL | unverified (the image is not a GIF) |
+| read-back URL | Steam returns a preview URL for the item | Steam returns none (the report says so, and no URL is invented) | — |
+| read-back visibility | Steam reads the item back as hidden | Steam reads it back as another visibility | — |
+| `[img]` rendering | a person put the returned `images.steamusercontent.com` URL in a description `[img]` tag and looked at the item page, and recorded that | — | unverified: the run never checks it |
+| video previews | after a confirmed `upload --yes`, `videos list --remote` lists the id as `on Steam` | the id is not listed after the upload | unverified (see [Videos](#videos)) |
+
+**Current status:** every outcome is unverified. No confirmed run has been recorded in this repository. Record a result here only from what a run printed or what the person observed.
+
+The report ends with the item id of the private item. It stays on the account until the user asks for it to be deleted. Read the item back at any time with `status --remote` or `images list`, and `videos list --remote` for the video ids.
 
 ## Rules and traps
 
