@@ -73,6 +73,10 @@ pub mod friends {
             .collect()
     }
 
+    /// Returns the online state of a friend as the local Steam client knows it.
+    /// Requires a running Steam client.
+    /// @param steamId64 - SteamID64 of the friend, as a BigInt
+    /// @returns the friend's `FriendState`
     #[napi]
     pub fn get_friend_state(steam_id64: BigInt) -> FriendState {
         match friend_of(steam_id64).state() {
@@ -95,6 +99,9 @@ pub mod friends {
             .map(|game| game.game.app_id().0)
     }
 
+    /// Returns the most recent co-play record between the local user and a friend.
+    /// @param steamId64 - SteamID64 of the friend, as a BigInt
+    /// @returns `appId` of the game played together (`0` when there is none) and `time`, the seconds since they last played together
     #[napi]
     pub fn get_friend_coplay_info(steam_id64: BigInt) -> CoplayInfo {
         let friend = friend_of(steam_id64);

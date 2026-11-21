@@ -24,6 +24,8 @@ impl PlayerSteamId {
 pub mod localplayer {
     use super::PlayerSteamId;
 
+    /// Returns the SteamID of the logged-in local user. Requires a running, logged-in Steam client.
+    /// @returns `steamId64` as a BigInt, `steamId32` as a string, and `accountId`
     #[napi]
     pub fn get_steam_id() -> PlayerSteamId {
         let client = crate::client::get_client();
@@ -31,12 +33,16 @@ pub mod localplayer {
         PlayerSteamId::from_steamid(steam_id)
     }
 
+    /// Returns the Steam display name of the local user. Requires a running Steam client.
+    /// @returns the persona name
     #[napi]
     pub fn get_name() -> String {
         let client = crate::client::get_client();
         client.friends().name()
     }
 
+    /// Returns the Steam level of the local user. Requires a running Steam client.
+    /// @returns the Steam level
     #[napi]
     pub fn get_level() -> u32 {
         let client = crate::client::get_client();
@@ -50,6 +56,9 @@ pub mod localplayer {
         client.utils().ip_country()
     }
 
+    /// Sets one Rich Presence value for the local user, visible to friends.
+    /// @param key - Rich Presence key
+    /// @param value - value to set; `null` or omitted removes the key
     #[napi]
     pub fn set_rich_presence(key: String, value: Option<String>) {
         let client = crate::client::get_client();

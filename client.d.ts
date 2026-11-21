@@ -1,7 +1,31 @@
+/**
+ * Initializes the Steam client for this process and requests the user's stats. If a client already exists, it is dropped first.
+ * Needs the Steam client to be running. Throws an Error carrying Steam's reason when initialization fails.
+ * Unverified against a live Steam client: whether a logged-out Steam client initializes.
+ * @param appId - The Steam app ID to initialize as. Omit it to use the app ID the SDK resolves on its own (for example from `steam_appid.txt`).
+ */
 export declare function init(appId?: number | undefined | null): void
+/**
+ * Checks whether Steam must relaunch this app. Does not need `init()`.
+ * Returns true when the app was not started by Steam and has no `steam_appid.txt`. Steam then starts the app through its client, and the app should exit as soon as possible. Returns false when Steam launched the app or `steam_appid.txt` is present.
+ * @param appId - The Steam app ID of the game.
+ * @returns true if Steam is relaunching the app and it should quit, otherwise false.
+ */
 export declare function restartAppIfNecessary(appId: number): boolean
+/**
+ * Dispatches pending Steam callbacks and call results to the handlers registered with `register()` and to pending async calls. Call it regularly, for example once per frame or on a timer, or events are delayed.
+ * Does nothing before `init()` or after `shutdown()`.
+ */
 export declare function runCallbacks(): void
+/**
+ * Releases the Steam client, which shuts down the Steam API. Safe to call when no client exists.
+ * After this call `isConnected()` returns false, and `init()` must run again before other Steam APIs are used.
+ */
 export declare function shutdown(): void
+/**
+ * Returns whether a Steam client is held, meaning `init()` succeeded and `shutdown()` has not been called since. Does not check that the Steam client is running or that a user is logged in.
+ * @returns true if the client is initialized, otherwise false.
+ */
 export declare function isConnected(): boolean
 export interface PlayerSteamId {
   steamId64: bigint
@@ -9,9 +33,30 @@ export interface PlayerSteamId {
   accountId: number
 }
 export declare namespace achievement {
+  /**
+   * Unlocks an achievement and stores the change to Steam. Needs `init()`, which requests the user's stats.
+   * Returns true when Steam accepted both the unlock and the store request. The store finishes asynchronously, and its result arrives through the UserStatsStored callback while `runCallbacks()` runs.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns true if the request was accepted, otherwise false (for example an unknown name, or stats that Steam has not received yet).
+   */
   export function activate(achievement: string): boolean
+  /**
+   * Checks whether the user has unlocked an achievement. Needs `init()`, which requests the user's stats.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns true if unlocked, otherwise false. False is also returned when the lookup fails (unknown name, or stats not received yet), so a failed lookup cannot be told apart from a locked achievement.
+   */
   export function isActivated(achievement: string): boolean
+  /**
+   * Re-locks an achievement and stores the change to Steam. Same requirements as `activate()`.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns true if Steam accepted both the clear and the store request, otherwise false.
+   */
   export function clear(achievement: string): boolean
+  /**
+   * Returns the API names of all achievements defined for the app. Needs `init()`.
+   * Fails when Steam returns no list; the binding then panics. Unverified against a live Steam client: how that failure reaches JavaScript.
+   * @returns the achievement API names defined for the app.
+   */
   export function names(): Array<string>
   /**
    * Fetches the global unlock percentages of every achievement. Resolves once Steam has answered;
@@ -25,19 +70,79 @@ export declare namespace achievement {
   export function getAchievedPercent(achievement: string): number | null
 }
 export declare namespace apps {
+  /**
+   * Checks whether the user is subscribed to another app, such as a demo or a related game. Per the SDK docs, use it for ownership of an app related to yours, not as a general ownership check.
+   * @param appId - The Steam app ID to check.
+   * @returns true if the user is subscribed to the app, otherwise false.
+   */
   export function isSubscribedApp(appId: number): boolean
+  /**
+   * Checks whether the app is installed for the current user. An installed app does not mean the user owns it.
+   * @param appId - The Steam app ID to check.
+   * @returns true if the app is currently installed, otherwise false.
+   */
   export function isAppInstalled(appId: number): boolean
+  /**
+   * Checks whether the user owns the DLC and has it installed.
+   * @param appId - The Steam app ID of the DLC.
+   * @returns true if the DLC is owned and installed, otherwise false.
+   */
   export function isDlcInstalled(appId: number): boolean
+  /**
+   * Checks whether the user is subscribed through a free weekend.
+   * @returns true if so, otherwise false.
+   */
   export function isSubscribedFromFreeWeekend(): boolean
+  /**
+   * Checks whether the user's account has a VAC ban.
+   * @returns true if the account is VAC banned, otherwise false.
+   */
   export function isVacBanned(): boolean
+  /**
+   * Checks whether the license for the current app is a cyber cafe license.
+   * @returns true if it is, otherwise false.
+   */
   export function isCybercafe(): boolean
+  /**
+   * Checks whether the license for the current app provides low violence depots.
+   * @returns true if it does, otherwise false.
+   */
   export function isLowViolence(): boolean
+  /**
+   * Checks whether the user is subscribed to the current app.
+   * @returns true if subscribed, otherwise false.
+   */
   export function isSubscribed(): boolean
+  /**
+   * Returns the build ID of the current app as Steam reports it.
+   * @returns the build ID as a signed 32-bit integer.
+   */
   export function appBuildId(): number
+  /**
+   * Returns the install folder of an app. Works even when the app is not installed, returning the folder it would use in the default location.
+   * @param appId - The Steam app ID to look up.
+   * @returns the install folder path.
+   */
   export function appInstallDir(appId: number): string
+  /**
+   * Returns the original owner of the current app. It differs from the current user only when the app is borrowed.
+   * @returns the owner as a PlayerSteamId with `steamId64`, `steamId32` and `accountId` fields.
+   */
   export function appOwner(): PlayerSteamId
+  /**
+   * Returns the languages the current app supports.
+   * @returns the language names as Steam reports them, or an empty array when none are listed.
+   */
   export function availableGameLanguages(): Array<string>
+  /**
+   * Returns the language the user has set for the current game. If the user has not set one, Steam returns the language of the Steam UI.
+   * @returns the language name as Steam reports it.
+   */
   export function currentGameLanguage(): string
+  /**
+   * Returns the beta branch the user is on for the current app.
+   * @returns the beta branch name, or `null` when the user is on the default branch.
+   */
   export function currentBetaName(): string | null
   /** @returns the command line the game was launched with, or an empty string */
   export function launchCommandLine(): string
@@ -55,9 +160,21 @@ export declare namespace auth {
    * @param timeoutSeconds - The number of seconds to wait for the ticket to be validated. Default value is 10 seconds.
    */
   export function getSessionTicketWithIp(ip: string, timeoutSeconds?: number | undefined | null): Promise<Ticket>
+  /**
+   * Requests an auth session ticket for a Steam Web API service and waits for Steam to validate it. Needs `init()`.
+   * Rejects with Steam's error on failure, or with "Steam didn't validated the ticket in time." when Steam does not answer within the timeout. The ticket is cancelled in both cases. Call `cancel()` on the returned Ticket once the remote side no longer needs it.
+   * @param identity - The identity string of the Web API service that will validate the ticket.
+   * @param timeoutSeconds - Seconds to wait for Steam before rejecting. Defaults to 10.
+   * @returns a Ticket holding the ticket bytes, readable with `getBytes()`.
+   */
   export function getAuthTicketForWebApi(identity: string, timeoutSeconds?: number | undefined | null): Promise<Ticket>
   export class Ticket {
+    /** Cancels the auth ticket with Steam so it can no longer be used. Call it only while the Steam client is initialized. */
     cancel(): void
+    /**
+     * Returns a copy of the ticket bytes. Does not call Steam.
+     * @returns the ticket as a Buffer, to send to the service that validates it.
+     */
     getBytes(): Buffer
   }
 }
@@ -87,19 +204,66 @@ export declare namespace callback {
     AuthSessionTicketResponse = 21,
     ValidateAuthTicketResponse = 22
   }
+  /**
+   * Registers a handler for a Steam callback. Needs `init()`.
+   * The handler receives each callback payload as a JSON-compatible value on the JavaScript event loop. Steam events are dispatched only while `runCallbacks()` runs.
+   * @param steamCallback - The callback kind to listen for.
+   * @param handler - Called with each payload of that callback.
+   * @returns a Handle; call `disconnect()` on it to stop the handler.
+   */
   export function register<C extends keyof import('./callbacks').CallbackReturns>(steamCallback: C, handler: (value: import('./callbacks').CallbackReturns[C]) => void): Handle
   export class Handle {
+    /** Stops the handler registered for this Handle from being called. Calling it again does nothing. */
     disconnect(): void
   }
 }
 export declare namespace cloud {
+  /**
+   * Checks whether Steam Cloud is enabled for the user's account. This is separate from the app setting (`isEnabledForApp()`).
+   * @returns true if enabled for the account, otherwise false.
+   */
   export function isEnabledForAccount(): boolean
+  /**
+   * Checks whether Steam Cloud is enabled for the current app. This is separate from the account setting (`isEnabledForAccount()`).
+   * @returns true if enabled for the app, otherwise false.
+   */
   export function isEnabledForApp(): boolean
+  /**
+   * Turns Steam Cloud on or off for the current app. It does not change the account setting. Returns nothing, and the binding does not report whether Steam applied the change.
+   * @param enabled - true to enable Steam Cloud for the app, false to disable it.
+   */
   export function setEnabledForApp(enabled: boolean): void
+  /**
+   * Reads a Steam Cloud file as UTF-8 text. Needs `init()`.
+   * Rejects with "Failed to read file" when the file cannot be read or its bytes are not valid UTF-8. Unverified against a live Steam client: a missing file is read as empty text on this code path.
+   * @param name - The cloud file name.
+   * @returns the file content as a string.
+   */
   export function readFile(name: string): string
+  /**
+   * Writes text to a Steam Cloud file as UTF-8, replacing its previous content. Needs `init()`.
+   * The write is committed when the write stream closes, which happens before this call returns.
+   * @param name - The cloud file name.
+   * @param content - Text to write, encoded as UTF-8.
+   * @returns true if the content was accepted by the write stream, false if writing failed. The commit result is not reported. Unverified against a live Steam client whether a failed commit is visible.
+   */
   export function writeFile(name: string, content: string): boolean
+  /**
+   * Deletes a Steam Cloud file both locally and in the cloud. Needs `init()`.
+   * @param name - The cloud file name.
+   * @returns true if a file was deleted, false if none was.
+   */
   export function deleteFile(name: string): boolean
+  /**
+   * Checks whether a Steam Cloud file exists. Needs `init()`.
+   * @param name - The cloud file name.
+   * @returns true if the file exists, otherwise false.
+   */
   export function fileExists(name: string): boolean
+  /**
+   * Lists the Steam Cloud files of the current app. Needs `init()`.
+   * @returns an array of entries with `name` and `size` fields, where size is the file size in bytes as a BigInt. The array is empty when there are no files.
+   */
   export function listFiles(): Array<FileInfo>
   /** The platforms a cloud file syncs to. */
   export const enum SyncPlatform {
@@ -156,9 +320,20 @@ export declare namespace friends {
   export function getFriends(flags: number): Array<FriendInfo>
   /** Players the local user has recently played with. */
   export function getCoplayFriends(): Array<FriendInfo>
+  /**
+   * Returns the online state of a friend as the local Steam client knows it.
+   * Requires a running Steam client.
+   * @param steamId64 - SteamID64 of the friend, as a BigInt
+   * @returns the friend's `FriendState`
+   */
   export function getFriendState(steamId64: bigint): FriendState
   /** @returns the AppID of the game the friend is playing, or `null` when they are not in a game */
   export function getFriendGamePlayed(steamId64: bigint): number | null
+  /**
+   * Returns the most recent co-play record between the local user and a friend.
+   * @param steamId64 - SteamID64 of the friend, as a BigInt
+   * @returns `appId` of the game played together (`0` when there is none) and `time`, the seconds since they last played together
+   */
   export function getFriendCoplayInfo(steamId64: bigint): CoplayInfo
   /** @returns the small (32x32) avatar as RGBA pixels, or `null` when it has not been loaded */
   export function getSmallAvatar(steamId64: bigint): Buffer | null
@@ -197,11 +372,36 @@ export declare namespace input {
     x: number
     y: number
   }
+  /**
+   * Initializes Steam Input. Call it before reading controllers or action data.
+   * Steam Input is updated from the Steam callback loop (`SteamAPI_RunCallbacks()`), not by a separate per-frame call.
+   * Requires a running Steam client.
+   */
   export function init(): void
+  /**
+   * Lists the controllers Steam Input currently sees as connected.
+   * @returns a `Controller` for each connected controller, or an empty array when none are connected
+   */
   export function getControllers(): Array<Controller>
+  /**
+   * Looks up the handle of an action set defined in the game's Steam Input configuration.
+   * @param actionSetName - name of the action set, as it is defined in the Steam Input configuration
+   * @returns the action set handle as a BigInt. Unverified against a live Steam client: a name that is not found is expected to return `0`.
+   */
   export function getActionSet(actionSetName: string): bigint
+  /**
+   * Looks up the handle of a digital action defined in the game's Steam Input configuration.
+   * @param actionName - name of the digital action, as it is defined in the Steam Input configuration
+   * @returns the action handle as a BigInt. Unverified against a live Steam client: a name that is not found is expected to return `0`.
+   */
   export function getDigitalAction(actionName: string): bigint
+  /**
+   * Looks up the handle of an analog action defined in the game's Steam Input configuration.
+   * @param actionName - name of the analog action, as it is defined in the Steam Input configuration
+   * @returns the action handle as a BigInt. Unverified against a live Steam client: a name that is not found is expected to return `0`.
+   */
   export function getAnalogAction(actionName: string): bigint
+  /** Shuts down Steam Input. Call `init` again before using controllers or actions after this. */
   export function shutdown(): void
   export interface DigitalActionData {
     /** `true` while the digital action is pressed. */
@@ -231,10 +431,32 @@ export declare namespace input {
   /** @returns the glyph image path of an action origin */
   export function getGlyphForActionOrigin(origin: number): string
   export class Controller {
+    /**
+     * Switches this controller to an action set. The call is cheap and can be repeated safely.
+     * @param actionSetHandle - action set handle from `getActionSet`
+     */
     activateActionSet(actionSetHandle: bigint): void
+    /**
+     * Checks whether a digital action is pressed on this controller.
+     * @param actionHandle - digital action handle from `getDigitalAction`
+     * @returns `true` while the action is pressed, otherwise `false`
+     */
     isDigitalActionPressed(actionHandle: bigint): boolean
+    /**
+     * Reads the current vector of an analog action on this controller.
+     * @param actionHandle - analog action handle from `getAnalogAction`
+     * @returns `x` and `y` as reported by Steam Input. Unverified against a live Steam client: the value ranges are not checked here.
+     */
     getAnalogActionVector(actionHandle: bigint): AnalogActionVector
+    /**
+     * Identifies the type of this controller.
+     * @returns the controller's `InputType`, `Unknown` when Steam cannot identify it
+     */
     getType(): InputType
+    /**
+     * Returns the Steam Input handle of this controller.
+     * @returns the handle as a BigInt, the value used by controller-scoped Steam Input calls
+     */
     getHandle(): bigint
   }
 }
@@ -309,11 +531,28 @@ export declare namespace leaderboard {
   }
 }
 export declare namespace localplayer {
+  /**
+   * Returns the SteamID of the logged-in local user. Requires a running, logged-in Steam client.
+   * @returns `steamId64` as a BigInt, `steamId32` as a string, and `accountId`
+   */
   export function getSteamId(): PlayerSteamId
+  /**
+   * Returns the Steam display name of the local user. Requires a running Steam client.
+   * @returns the persona name
+   */
   export function getName(): string
+  /**
+   * Returns the Steam level of the local user. Requires a running Steam client.
+   * @returns the Steam level
+   */
   export function getLevel(): number
   /** @returns the 2 digit ISO 3166-1-alpha-2 format country code which client is running in, e.g. "US" or "UK". */
   export function getIpCountry(): string
+  /**
+   * Sets one Rich Presence value for the local user, visible to friends.
+   * @param key - Rich Presence key
+   * @param value - value to set; `null` or omitted removes the key
+   */
   export function setRichPresence(key: string, value?: string | undefined | null): void
 }
 export declare namespace matchmaking {
@@ -323,21 +562,79 @@ export declare namespace matchmaking {
     Public = 2,
     Invisible = 3
   }
+  /**
+   * Creates a new lobby and makes the local user its owner.
+   * @param lobbyType - visibility of the lobby
+   * @param maxMembers - maximum number of members; Steam rejects values above 250
+   * @returns the new `Lobby`; rejects with Steam's error text when creation fails
+   */
   export function createLobby(lobbyType: LobbyType, maxMembers: number): Promise<Lobby>
+  /**
+   * Joins a lobby by its ID.
+   * @param lobbyId - lobby ID as a BigInt
+   * @returns the joined `Lobby`; rejects with `Failed to join lobby` when Steam refuses the join
+   */
   export function joinLobby(lobbyId: bigint): Promise<Lobby>
+  /**
+   * Requests the lobby list from Steam. The list follows the filters Steam applies by default. Unverified against a live Steam client.
+   * @returns a `Lobby` for each lobby in the result; rejects with an error when the request fails
+   */
   export function getLobbies(): Promise<Array<Lobby>>
   export class Lobby {
     id: bigint
+    /**
+     * Joins this lobby.
+     * @returns a `Lobby` for the joined lobby; rejects with `Failed to join lobby` when Steam refuses the join
+     */
     join(): Promise<Lobby>
+    /** Leaves this lobby. */
     leave(): void
+    /** Opens the Steam invite dialog for this lobby. */
     openInviteDialog(): void
+    /**
+     * Returns the number of members currently in this lobby.
+     * @returns the member count
+     */
     getMemberCount(): bigint
+    /**
+     * Returns the maximum number of members this lobby allows.
+     * @returns the member limit, or `null` when Steam has no metadata for the lobby
+     */
     getMemberLimit(): bigint | null
+    /**
+     * Returns the members of this lobby.
+     * @returns a `PlayerSteamId` for each member, empty when there are none
+     */
     getMembers(): Array<PlayerSteamId>
+    /**
+     * Returns the owner of this lobby.
+     * @returns the owner's `PlayerSteamId`
+     */
     getOwner(): PlayerSteamId
+    /**
+     * Sets whether new users may join this lobby. Only the lobby owner can change this.
+     * @param joinable - `true` to allow joining, `false` to block it
+     * @returns `true` when Steam accepted the change
+     */
     setJoinable(joinable: boolean): boolean
+    /**
+     * Reads one metadata value of this lobby.
+     * @param key - metadata key
+     * @returns the value, or `null` when the key is not set
+     */
     getData(key: string): string | null
+    /**
+     * Sets one metadata value of this lobby. Only the lobby owner can set lobby data.
+     * @param key - metadata key
+     * @param value - value to store
+     * @returns `true` when Steam accepted the change
+     */
     setData(key: string, value: string): boolean
+    /**
+     * Deletes one metadata value of this lobby. Only the lobby owner can delete lobby data.
+     * @param key - metadata key to delete
+     * @returns `true` when Steam accepted the change
+     */
     deleteData(key: string): boolean
     /** Get an object containing all the lobby data */
     getFullData(): Record<string, string>
@@ -451,10 +748,38 @@ export declare namespace networking {
      */
     ReliableWithBuffering = 3
   }
+  /**
+   * Sends a packet to another user over Steam peer-to-peer networking.
+   * @param steamId64 - recipient SteamID64 as a BigInt
+   * @param sendType - delivery mode; each mode has its own size limit
+   * @param data - packet payload
+   * @returns `true` when Steam queued the packet
+   */
   export function sendP2PPacket(steamId64: bigint, sendType: SendType, data: Buffer): boolean
+  /**
+   * Checks whether a packet is waiting to be read on channel 0.
+   * @returns the size in bytes of the next packet, or `0` when none is waiting
+   */
   export function isP2PPacketAvailable(): number
+  /**
+   * Reads the next waiting packet on channel 0.
+   * @param size - size of the receive buffer in bytes
+   * @returns `data` (the buffer), `size` (bytes read) and `steamId` of the sender; rejects with `No packet available` when none is waiting
+   */
   export function readP2PPacket(size: number): P2PPacket
+  /**
+   * Accepts a peer-to-peer session request from a user. Call it in response to a session request from that user.
+   * @param steamId64 - SteamID64 of the user as a BigInt
+   */
   export function acceptP2PSession(steamId64: bigint): void
+  /**
+   * Sends a packet to another user on a specific channel. Each channel is an independent stream.
+   * @param steamId64 - recipient SteamID64 as a BigInt
+   * @param sendType - delivery mode; each mode has its own size limit
+   * @param data - packet payload
+   * @param channel - channel number
+   * @returns `true` when Steam queued the packet
+   */
   export function sendP2PPacketOnChannel(steamId64: bigint, sendType: SendType, data: Buffer, channel: number): boolean
   /** @returns the size of the next packet on the channel, or 0 when none is waiting */
   export function isP2PPacketAvailableOnChannel(channel: number): number
@@ -747,23 +1072,55 @@ export declare namespace networkingUtils {
 }
 export declare namespace overlay {
   export const enum Dialog {
+    /** Friends list dialog. */
     Friends = 0,
+    /** Steam Community dialog. */
     Community = 1,
+    /** Recent players dialog. */
     Players = 2,
+    /** Steam settings dialog. */
     Settings = 3,
+    /** Official group of the game. */
     OfficialGameGroup = 4,
+    /** Game statistics dialog. */
     Stats = 5,
+    /** Achievements dialog. */
     Achievements = 6
   }
   export const enum StoreFlag {
+    /** Open the store page without adding the app to the cart. */
     None = 0,
+    /** Add the app to the cart without showing the cart. */
     AddToCart = 1,
+    /** Add the app to the cart and show the cart. */
     AddToCartAndShow = 2
   }
+  /**
+   * Opens a Steam overlay dialog. Unverified against a live Steam client: nothing is shown when the overlay is disabled.
+   * @param dialog - dialog to open
+   */
   export function activateDialog(dialog: Dialog): void
+  /**
+   * Opens a Steam overlay dialog for a specific user. Unverified against a live Steam client.
+   * @param dialog - dialog to open
+   * @param steamId64 - SteamID64 of the user as a BigInt
+   */
   export function activateDialogToUser(dialog: Dialog, steamId64: bigint): void
+  /**
+   * Opens the Steam invite dialog for a lobby.
+   * @param lobbyId - lobby ID as a BigInt
+   */
   export function activateInviteDialog(lobbyId: bigint): void
+  /**
+   * Opens a web page in the Steam overlay browser. Unverified against a live Steam client.
+   * @param url - absolute URL to open
+   */
   export function activateToWebPage(url: string): void
+  /**
+   * Opens the Steam store page of an app in the overlay.
+   * @param appId - AppID of the app to show
+   * @param flag - whether to add the app to the cart, and whether to show the cart
+   */
   export function activateToStore(appId: number, flag: StoreFlag): void
 }
 export declare namespace remotePlay {
@@ -802,6 +1159,10 @@ export declare namespace remotePlay {
 export declare namespace screenshots {
   /** Turns the Steam screenshot hotkey into a `ScreenshotRequested` callback, so the game takes the screenshot itself. */
   export function hookScreenshots(hook: boolean): void
+  /**
+   * Checks whether the screenshot hotkey is currently hooked by the game (see `hookScreenshots`).
+   * @returns `true` when hooked, otherwise `false`
+   */
   export function isScreenshotsHooked(): boolean
   /** Triggers a screenshot, the same as the player pressing the screenshot hotkey. */
   export function triggerScreenshot(): void
@@ -812,9 +1173,29 @@ export declare namespace screenshots {
   export function addScreenshotToLibrary(filename: string, thumbnailFilename: string | undefined | null, width: number, height: number): number
 }
 export declare namespace stats {
+  /**
+   * Reads an integer stat of the local user from the locally loaded stats. Unverified against a live Steam client: the stats must be loaded first.
+   * @param name - stat name as defined in the Steamworks site
+   * @returns the stat value, or `null` when the stat is missing or not loaded
+   */
   export function getInt(name: string): number | null
+  /**
+   * Sets an integer stat of the local user. The value is not sent to Steam until `store()` is called.
+   * @param name - stat name as defined in the Steamworks site
+   * @param value - 32-bit signed integer
+   * @returns `true` when Steam accepted the change, otherwise `false`
+   */
   export function setInt(name: string, value: number): boolean
+  /**
+   * Sends the pending stat and achievement changes of the local user to Steam. The request is asynchronous, so `true` only means Steam accepted it.
+   * @returns `true` when Steam accepted the request, otherwise `false`
+   */
   export function store(): boolean
+  /**
+   * Resets all stats of the local user. This cannot be undone from this binding.
+   * @param achievementsToo - `true` also clears the user's achievements
+   * @returns `true` when Steam accepted the reset, otherwise `false`
+   */
   export function resetAll(achievementsToo: boolean): boolean
   /** @returns the float stat value, or `null` when the stat is not defined */
   export function getFloat(name: string): number | null
@@ -851,8 +1232,20 @@ export declare namespace timeline {
   export function addEvent(icon: string, title: string, description: string, priority: number, startOffsetSeconds: number, durationSeconds: number, clipPriority: TimelineEventClipPriority): void
 }
 export declare namespace utils {
+  /**
+   * Returns the AppID of the running game.
+   * @returns the AppID
+   */
   export function getAppId(): number
+  /**
+   * Returns the current time on the Steam servers.
+   * @returns seconds since 1970-01-01 UTC
+   */
   export function getServerRealTime(): number
+  /**
+   * Checks whether Steam is running on a Steam Deck.
+   * @returns `true` on a Steam Deck, otherwise `false`
+   */
   export function isSteamRunningOnSteamDeck(): boolean
   export const enum GamepadTextInputMode {
     Normal = 0,
@@ -881,7 +1274,9 @@ export declare namespace utils {
 }
 export declare namespace workshop {
   export interface UgcResult {
+    /** The Workshop item id the update or creation applies to. */
     itemId: bigint
+    /** True when Steam reports that the account still has to accept the Workshop legal agreement. */
     needsToAcceptAgreement: boolean
   }
   export const enum UgcItemVisibility {
@@ -928,17 +1323,25 @@ export declare namespace workshop {
     add?: Array<WorkshopContentDescriptor>
   }
   export interface UgcUpdate {
+    /** New title of the item, in the language given by `language`. */
     title?: string
+    /** New description of the item, in the language given by `language`. */
     description?: string
+    /** Note shown in the item's change history for this update. */
     changeNote?: string
+    /** Absolute path of an image file that replaces the main preview. */
     previewPath?: string
     /** Image files appended to the item's additional previews (screenshots). */
     additionalPreviewPaths?: Array<string>
     /** 0-based indexes of additional previews to remove, as listed in `additionalPreviews`. */
     removeAdditionalPreviewIndexes?: Array<number>
+    /** Absolute path of a folder whose files become the item's content. */
     contentPath?: string
+    /** Tags for the item. When given, they replace the item's tag list. */
     tags?: Array<string>
+    /** Who can see the item: Public, FriendsOnly, Private or Unlisted. */
     visibility?: UgcItemVisibility
+    /** Steam language code (for example `english` or `schinese`) that `title` and `description` are written in. Left out, the README says it is treated as `english`. */
     language?: string
     /**
      * Oldest game version (Steam branch, e.g. `open_beta`) the item is valid for.
@@ -987,6 +1390,24 @@ export declare namespace workshop {
    * @param fileType - the Workshop file type; omitted keeps `Community`
    */
   export function createItem(appId?: number | undefined | null, fileType?: WorkshopFileType | undefined | null): Promise<UgcResult>
+  /**
+   * Updates an existing Workshop item on Steam. Every field of `updateDetails` is optional: a field
+   * that is left out keeps the item's current value, so a call with only `previewPath` changes only
+   * the preview. The fields are checked first, and a bad YouTube video id or a string with a NUL byte
+   * rejects with the entry named, before anything is sent.
+   *
+   * Once submitted, the change is applied to the item on Steam and cannot be cancelled. A running,
+   * logged-in Steam client is needed.
+   *
+   * Resolves with the item id and `needsToAcceptAgreement`. Rejects when the update cannot be started,
+   * when Steam returns an error, or when no completion arrives; in that last case the outcome is
+   * unknown, so read the item before retrying.
+   *
+   * @param itemId - the Workshop item to update (its published file id)
+   * @param updateDetails - the fields to change; see `UgcUpdate`
+   * @param appId - defaults to the app id the client was initialized with
+   * @returns the item id and whether the account still has to accept the Workshop legal agreement
+   */
   export function updateItem(itemId: bigint, updateDetails: UgcUpdate, appId?: number | undefined | null): Promise<UgcResult>
   /**
    * Replace only the main preview image of a Workshop item.
@@ -1012,6 +1433,29 @@ export declare namespace workshop {
    * @param changeNote - optional change note shown in the item's change history
    */
   export function updateItemContent(itemId: bigint, contentPath: string, appId?: number | undefined | null, changeNote?: string | undefined | null): Promise<UgcResult>
+  /**
+   * Updates an existing Workshop item on Steam, like `updateItem`, but reports the outcome through
+   * callbacks instead of a promise. The call returns at once; the work continues in the background.
+   * Its fields are checked the same way as in `updateItem`.
+   *
+   * `successCallback` receives the `UgcResult`. `errorCallback` receives every failure, both the
+   * check that runs before anything is sent and the errors Steam reports later. Nothing is thrown.
+   *
+   * `progressCallback` receives an `UpdateProgress` right away and then every
+   * `progressCallbackIntervalMs`, until the status is `Invalid` or `CommittingChanges`. The units of
+   * `progress` and `total` are unverified against a live Steam client.
+   *
+   * Once submitted, the change is applied to the item on Steam and cannot be cancelled. A running,
+   * logged-in Steam client is needed.
+   *
+   * @param itemId - the Workshop item to update (its published file id)
+   * @param updateDetails - the fields to change; see `UgcUpdate`
+   * @param appId - defaults to the app id the client was initialized with
+   * @param successCallback - called with the `UgcResult` when Steam completes the update
+   * @param errorCallback - called with an `Error` when the update is refused or fails
+   * @param progressCallback - optional; called with the `UpdateProgress` while the update runs
+   * @param progressCallbackIntervalMs - milliseconds between progress reports; defaults to 1000
+   */
   export function updateItemWithCallback(itemId: bigint, updateDetails: UgcUpdate, appId: number | undefined | null, successCallback: (data: UgcResult) => void, errorCallback: (err: any) => void, progressCallback?: (data: UpdateProgress) => void, progressCallbackIntervalMs?: number | undefined | null): void
   /**
    * Subscribe to a workshop item. It will be downloaded and installed as soon as possible.
@@ -1065,6 +1509,19 @@ export declare namespace workshop {
    * @returns an array of subscribed workshop item ids
    */
   export function getSubscribedItems(): Array<bigint>
+  /**
+   * Permanently deletes a Workshop item on Steam. The item is removed from the Workshop; the deletion
+   * cannot be cancelled once it has been sent. A running, logged-in Steam client is needed.
+   *
+   * The code does not check ownership first; Steam decides whether the account may delete the item.
+   *
+   * Resolves with no value once Steam confirms the deletion. Rejects when Steam returns an error, or
+   * when no completion arrives; in that last case the outcome is unknown, so read the item before
+   * retrying.
+   *
+   * @param itemId - the Workshop item to delete (its published file id)
+   * @returns resolves with no value once Steam confirms the deletion
+   */
   export function deleteItem(itemId: bigint): Promise<void>
   /**
    * Marks `childId` as a required item of `parentId`. Resolves with the Steam result code, where `1` is
@@ -1271,11 +1728,17 @@ export declare namespace workshop {
     maxBranch?: string
   }
   export interface WorkshopItem {
+    /** The Workshop item's published file id. */
     publishedFileId: bigint
+    /** The app id that created the item. */
     creatorAppId?: number
+    /** The app id that uses the item. */
     consumerAppId?: number
+    /** The item's title. */
     title: string
+    /** The item's description. */
     description: string
+    /** The Steam account that owns the item. */
     owner: PlayerSteamId
     /** Time created in unix epoch seconds format */
     timeCreated: number
@@ -1283,17 +1746,28 @@ export declare namespace workshop {
     timeUpdated: number
     /** Time when the user added the published item to their list (not always applicable), provided in Unix epoch format (time since Jan 1st, 1970). */
     timeAddedToUserList: number
+    /** Who can see the item: Public, FriendsOnly, Private or Unlisted. */
     visibility: UgcItemVisibility
+    /** Whether Steam has banned the item. */
     banned: boolean
+    /** Whether Steam has accepted the item for use. */
     acceptedForUse: boolean
+    /** The item's tags. */
     tags: Array<string>
+    /** Whether Steam cut the tag list short. */
     tagsTruncated: boolean
     url: string
+    /** Number of upvotes the item has. */
     numUpvotes: number
+    /** Number of downvotes the item has. */
     numDownvotes: number
+    /** Number of required items the item has. */
     numChildren: number
+    /** URL of the item's main preview image, when Steam returns one. */
     previewUrl?: string
+    /** Counts for the item, such as subscriptions and favorites. */
     statistics: WorkshopItemStatistic
+    /** Ids of the item's required items. Present only with `returnChildren`. */
     children?: Array<bigint>
     /** Additional preview media (images, videos, etc.) for the workshop item */
     additionalPreviews?: Array<AdditionalPreview>
@@ -1301,36 +1775,120 @@ export declare namespace workshop {
     supportedGameVersions: Array<SupportedGameVersion>
   }
   export interface WorkshopPaginatedResult {
+    /** The entries of this page; `null` where Steam returned no record. */
     items: Array<WorkshopItem | undefined | null>
+    /** The number of entries Steam returned on this page. */
     returnedResults: number
+    /** The number of matches across all pages. */
     totalResults: number
+    /** Whether the answer came from Steam's cache. */
     wasCached: boolean
   }
   export interface WorkshopItemsResult {
+    /** One entry per record Steam returned; `null` where Steam returned no record. */
     items: Array<WorkshopItem | undefined | null>
+    /** Whether the answer came from Steam's cache. */
     wasCached: boolean
   }
   export interface WorkshopItemQueryConfig {
+    /** Oldest cached answer Steam may return, in seconds. */
     cachedResponseMaxAge?: number
+    /** Return the item's developer metadata. */
     includeMetadata?: boolean
+    /** Return the long description of the item. */
     includeLongDescription?: boolean
+    /** Fill `additionalPreviews` on each returned item. */
     includeAdditionalPreviews?: boolean
+    /** Return only the item ids, not the item details. */
     onlyIds?: boolean
+    /** Return only the total number of matches. */
     onlyTotal?: boolean
+    /** Steam language code for the returned title and description, such as `schinese`. */
     language?: string
+    /** Match items that have any of the required tags, instead of all of them. */
     matchAnyTag?: boolean
+    /** Tags an item must have. */
     requiredTags?: Array<string>
+    /** Tags an item must not have. */
     excludedTags?: Array<string>
+    /** Full-text search string. */
     searchText?: string
+    /** Number of days considered when ranking items by trend. */
     rankedByTrendDays?: number
+    /** Fill `children` with the ids of each item's required items. */
     returnChildren?: boolean
   }
   export interface AppIDs {
     creator?: number
     consumer?: number
   }
+  /**
+   * Gets one Workshop item by its published file id. The query runs through the Steam client, so a
+   * running Steam client is needed. Whether a logged-in account is also required is unverified
+   * against a live Steam client.
+   *
+   * Resolves with the item, or with `null` when the query returns no record for the id. The optional
+   * `children` field is filled only with `returnChildren`, and `additionalPreviews` only with
+   * `includeAdditionalPreviews`. Rejects when the query cannot be created or Steam returns an error.
+   *
+   * @param item - the Workshop item to read (its published file id)
+   * @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+   * @returns the item, or `null` when the query returned no record for the id
+   */
   export function getItem(item: bigint, queryConfig?: WorkshopItemQueryConfig | undefined | null): Promise<WorkshopItem | null>
+  /**
+   * Gets several Workshop items in one query. The query runs through the Steam client, so a running
+   * Steam client is needed. Whether a logged-in account is also required is unverified against a
+   * live Steam client.
+   *
+   * Resolves with `items` and `wasCached`. `items` has one entry per record Steam returned, and an
+   * entry is `null` where Steam returned no record. The entries are not matched back to the input
+   * ids, so use each item's `publishedFileId` to match them. Rejects when the query cannot be created
+   * or Steam returns an error.
+   *
+   * @param items - the published file ids to read
+   * @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+   * @returns `items`, and `wasCached` for whether the answer came from Steam's cache
+   */
   export function getItems(items: Array<bigint>, queryConfig?: WorkshopItemQueryConfig | undefined | null): Promise<WorkshopItemsResult>
+  /**
+   * Queries one page of all Workshop items that match the given type, ranking and app ids. The query
+   * runs through the Steam client, so a running Steam client is needed. Whether a logged-in account
+   * is also required is unverified against a live Steam client.
+   *
+   * Resolves with `items` for this page, `returnedResults` (the number of entries on this page),
+   * `totalResults` (the matches across all pages) and `wasCached`. Entries are `null` where Steam
+   * returned no record. To read everything, keep requesting pages while the collected count is below
+   * `totalResults` and the last page returned items. The page size is set by Steam; the README and
+   * the skill give 50 per page, unverified against a live Steam client. Rejects when the query cannot
+   * be created or Steam returns an error.
+   *
+   * @param page - the page to read, passed to Steam as given; the first page index is unverified against a live Steam client
+   * @param queryType - the ranking and filter of the query, a `UGCQueryType` value such as `RankedByPublicationDate`
+   * @param itemType - the kind of item to list, a `UGCType` value such as `Items`
+   * @param creatorAppId - the app id that created the items
+   * @param consumerAppId - the app id that uses the items; Steam filters by both app ids
+   * @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+   * @returns the page of items with `returnedResults`, `totalResults` and `wasCached`
+   */
   export function getAllItems(page: number, queryType: UGCQueryType, itemType: UGCType, creatorAppId: number, consumerAppId: number, queryConfig?: WorkshopItemQueryConfig | undefined | null): Promise<WorkshopPaginatedResult>
+  /**
+   * Queries one page of the Workshop items related to one user, such as their published, subscribed or
+   * favorited items. The query runs through the Steam client, so a running Steam client is needed.
+   * Whether a logged-in account is also required is unverified against a live Steam client.
+   *
+   * Resolves with the same fields as `getAllItems`: `items` for this page, `returnedResults`,
+   * `totalResults` and `wasCached`. Entries are `null` where Steam returned no record. Paging works as
+   * described for `getAllItems`. Rejects when the query cannot be created or Steam returns an error.
+   *
+   * @param page - the page to read, passed to Steam as given; the first page index is unverified against a live Steam client
+   * @param accountId - the 32-bit account id of the user (the lower 32 bits of their SteamID64)
+   * @param listType - which list to read, a `UserListType` value such as `Published` or `Subscribed`
+   * @param itemType - the kind of item to list, a `UGCType` value such as `Items`
+   * @param sortOrder - the order of the list, a `UserListOrder` value such as `LastUpdatedDesc`
+   * @param appIds - the `creator` and `consumer` app ids; a missing one is sent as `0`, and what Steam does with `0` is unverified
+   * @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+   * @returns the page of items with `returnedResults`, `totalResults` and `wasCached`
+   */
   export function getUserItems(page: number, accountId: number, listType: UserListType, itemType: UGCType, sortOrder: UserListOrder, appIds: AppIDs, queryConfig?: WorkshopItemQueryConfig | undefined | null): Promise<WorkshopPaginatedResult>
 }

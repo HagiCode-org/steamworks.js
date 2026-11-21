@@ -7,18 +7,24 @@ pub mod utils {
     use steamworks::GamepadTextInputMode as kGamepadTextInputMode;
     use tokio::sync::oneshot;
 
+    /// Returns the AppID of the running game.
+    /// @returns the AppID
     #[napi]
     pub fn get_app_id() -> u32 {
         let client = crate::client::get_client();
         client.utils().app_id().0
     }
 
+    /// Returns the current time on the Steam servers.
+    /// @returns seconds since 1970-01-01 UTC
     #[napi]
     pub fn get_server_real_time() -> u32 {
         let client = crate::client::get_client();
         client.utils().get_server_real_time()
     }
 
+    /// Checks whether Steam is running on a Steam Deck.
+    /// @returns `true` on a Steam Deck, otherwise `false`
     #[napi]
     pub fn is_steam_running_on_steam_deck() -> bool {
         let client = crate::client::get_client();

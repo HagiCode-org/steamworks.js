@@ -52,6 +52,8 @@ pub mod input {
 
     #[napi]
     impl Controller {
+        /// Switches this controller to an action set. The call is cheap and can be repeated safely.
+        /// @param actionSetHandle - action set handle from `getActionSet`
         #[napi]
         pub fn activate_action_set(&self, action_set_handle: BigInt) {
             let client = crate::client::get_client();
@@ -60,6 +62,9 @@ pub mod input {
                 .activate_action_set_handle(self.handle.get_u64().1, action_set_handle.get_u64().1)
         }
 
+        /// Checks whether a digital action is pressed on this controller.
+        /// @param actionHandle - digital action handle from `getDigitalAction`
+        /// @returns `true` while the action is pressed, otherwise `false`
         #[napi]
         pub fn is_digital_action_pressed(&self, action_handle: BigInt) -> bool {
             let client = crate::client::get_client();
@@ -69,6 +74,9 @@ pub mod input {
                 .bState
         }
 
+        /// Reads the current vector of an analog action on this controller.
+        /// @param actionHandle - analog action handle from `getAnalogAction`
+        /// @returns `x` and `y` as reported by Steam Input. Unverified against a live Steam client: the value ranges are not checked here.
         #[napi]
         pub fn get_analog_action_vector(&self, action_handle: BigInt) -> AnalogActionVector {
             let client = crate::client::get_client();
@@ -81,6 +89,8 @@ pub mod input {
             }
         }
 
+        /// Identifies the type of this controller.
+        /// @returns the controller's `InputType`, `Unknown` when Steam cannot identify it
         #[napi]
         pub fn get_type(&self) -> InputType {
             let client = crate::client::get_client();
@@ -90,6 +100,8 @@ pub mod input {
                 .into()
         }
 
+        /// Returns the Steam Input handle of this controller.
+        /// @returns the handle as a BigInt, the value used by controller-scoped Steam Input calls
         #[napi]
         pub fn get_handle(&self) -> BigInt {
             self.handle.clone()
@@ -102,12 +114,17 @@ pub mod input {
         pub y: f64,
     }
 
+    /// Initializes Steam Input. Call it before reading controllers or action data.
+    /// Steam Input is updated from the Steam callback loop (`SteamAPI_RunCallbacks()`), not by a separate per-frame call.
+    /// Requires a running Steam client.
     #[napi]
     pub fn init() {
         let client = crate::client::get_client();
         client.input().init(false);
     }
 
+    /// Lists the controllers Steam Input currently sees as connected.
+    /// @returns a `Controller` for each connected controller, or an empty array when none are connected
     #[napi]
     pub fn get_controllers() -> Vec<Controller> {
         let client = crate::client::get_client();
@@ -121,24 +138,34 @@ pub mod input {
             .collect()
     }
 
+    /// Looks up the handle of an action set defined in the game's Steam Input configuration.
+    /// @param actionSetName - name of the action set, as it is defined in the Steam Input configuration
+    /// @returns the action set handle as a BigInt. Unverified against a live Steam client: a name that is not found is expected to return `0`.
     #[napi]
     pub fn get_action_set(action_set_name: String) -> BigInt {
         let client = crate::client::get_client();
         BigInt::from(client.input().get_action_set_handle(&action_set_name))
     }
 
+    /// Looks up the handle of a digital action defined in the game's Steam Input configuration.
+    /// @param actionName - name of the digital action, as it is defined in the Steam Input configuration
+    /// @returns the action handle as a BigInt. Unverified against a live Steam client: a name that is not found is expected to return `0`.
     #[napi]
     pub fn get_digital_action(action_name: String) -> BigInt {
         let client = crate::client::get_client();
         BigInt::from(client.input().get_digital_action_handle(&action_name))
     }
 
+    /// Looks up the handle of an analog action defined in the game's Steam Input configuration.
+    /// @param actionName - name of the analog action, as it is defined in the Steam Input configuration
+    /// @returns the action handle as a BigInt. Unverified against a live Steam client: a name that is not found is expected to return `0`.
     #[napi]
     pub fn get_analog_action(action_name: String) -> BigInt {
         let client = crate::client::get_client();
         BigInt::from(client.input().get_analog_action_handle(&action_name))
     }
 
+    /// Shuts down Steam Input. Call `init` again before using controllers or actions after this.
     #[napi]
     pub fn shutdown() {
         let client = crate::client::get_client();

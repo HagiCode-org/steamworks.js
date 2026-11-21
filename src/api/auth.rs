@@ -19,12 +19,15 @@ pub mod auth {
 
     #[napi]
     impl Ticket {
+        /// Cancels the auth ticket with Steam so it can no longer be used. Call it only while the Steam client is initialized.
         #[napi]
         pub fn cancel(&mut self) {
             let client = crate::client::get_client();
             client.user().cancel_authentication_ticket(self.handle);
         }
 
+        /// Returns a copy of the ticket bytes. Does not call Steam.
+        /// @returns the ticket as a Buffer, to send to the service that validates it.
         #[napi]
         pub fn get_bytes(&self) -> Buffer {
             self.data.clone().into()
@@ -117,6 +120,11 @@ pub mod auth {
         }
     }
 
+    /// Requests an auth session ticket for a Steam Web API service and waits for Steam to validate it. Needs `init()`.
+    /// Rejects with Steam's error on failure, or with "Steam didn't validated the ticket in time." when Steam does not answer within the timeout. The ticket is cancelled in both cases. Call `cancel()` on the returned Ticket once the remote side no longer needs it.
+    /// @param identity - The identity string of the Web API service that will validate the ticket.
+    /// @param timeoutSeconds - Seconds to wait for Steam before rejecting. Defaults to 10.
+    /// @returns a Ticket holding the ticket bytes, readable with `getBytes()`.
     #[napi]
     pub async fn get_auth_ticket_for_web_api(
         identity: String,

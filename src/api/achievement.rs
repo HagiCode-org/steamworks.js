@@ -6,6 +6,10 @@ pub mod achievement {
     use napi::bindgen_prelude::Error;
     use tokio::sync::oneshot;
 
+    /// Unlocks an achievement and stores the change to Steam. Needs `init()`, which requests the user's stats.
+    /// Returns true when Steam accepted both the unlock and the store request. The store finishes asynchronously, and its result arrives through the UserStatsStored callback while `runCallbacks()` runs.
+    /// @param achievement - The achievement API name as configured in Steamworks.
+    /// @returns true if the request was accepted, otherwise false (for example an unknown name, or stats that Steam has not received yet).
     #[napi]
     pub fn activate(achievement: String) -> bool {
         let client = crate::client::get_client();
@@ -17,6 +21,9 @@ pub mod achievement {
             .is_ok()
     }
 
+    /// Checks whether the user has unlocked an achievement. Needs `init()`, which requests the user's stats.
+    /// @param achievement - The achievement API name as configured in Steamworks.
+    /// @returns true if unlocked, otherwise false. False is also returned when the lookup fails (unknown name, or stats not received yet), so a failed lookup cannot be told apart from a locked achievement.
     #[napi]
     pub fn is_activated(achievement: String) -> bool {
         let client = crate::client::get_client();
@@ -27,6 +34,9 @@ pub mod achievement {
             .unwrap_or(false)
     }
 
+    /// Re-locks an achievement and stores the change to Steam. Same requirements as `activate()`.
+    /// @param achievement - The achievement API name as configured in Steamworks.
+    /// @returns true if Steam accepted both the clear and the store request, otherwise false.
     #[napi]
     pub fn clear(achievement: String) -> bool {
         let client = crate::client::get_client();
@@ -38,6 +48,9 @@ pub mod achievement {
             .is_ok()
     }
 
+    /// Returns the API names of all achievements defined for the app. Needs `init()`.
+    /// Fails when Steam returns no list; the binding then panics. Unverified against a live Steam client: how that failure reaches JavaScript.
+    /// @returns the achievement API names defined for the app.
     #[napi]
     pub fn names() -> Vec<String> {
         let client = crate::client::get_client();
