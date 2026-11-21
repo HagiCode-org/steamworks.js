@@ -10,6 +10,8 @@
     workshop.py images list   <item-dir>
     workshop.py images upload <item-dir> [--yes]
     workshop.py images remove <item-dir> <file-name>... [--yes]
+    workshop.py videos list   <item-dir> [--remote]
+    workshop.py artwork --app-id N --image FILE --title T [--yes]   (a private Art item with one image; a validation run)
 
 <item-dir> is the folder that owns the item (for a mod: its own folder). Its metadata lives in <item-dir>/workshop/
 (see references/item-layout.md). Nothing is submitted to Steam unless a command gets --yes, and every --yes write also needs
@@ -44,6 +46,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 from pathlib import Path
 
@@ -486,8 +489,10 @@ def cmd_upload(args) -> None:
     print(f"tags       {', '.join(tags) or '(none: this clears the tags on Steam)'}")
     if meta.get("screenshots"):
         print(f"screenshots  not part of this upload; use `images upload` ({len(meta['screenshots'])} listed)")
-    if meta.get("videos"):
-        print(f"videos       not part of this upload; Steam takes videos only as YouTube links, added by hand on the item page (`videos list`, {len(meta['videos'])} listed)")
+    video_ids = [v["youtubeId"] for v in meta.get("videos", [])]
+    if video_ids:
+        print(f"videos       {len(video_ids)} YouTube id(s) sent as additional preview videos: {', '.join(video_ids)} "
+              "(a re-upload skips the ones Steam already lists; check with `videos list --remote`)")
     if not args.yes:
         print("dry run: nothing was sent to Steam. Re-run with --yes to submit this exact content.")
         return
@@ -497,6 +502,8 @@ def cmd_upload(args) -> None:
            "--content", str(content), "--preview", str(preview), "--translations", str(translations),
            "--visibility", visibility, "--changenote", changenote]
     cmd += ["--tags", ",".join(tags)]  # always sent: an empty list clears the tags, as the item's tags say
+    if video_ids:
+        cmd += ["--videos", ",".join(video_ids)]  # sent only when listed, so an upload without videos is the same call as before
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     needs_agreement = False
     for line in proc.stdout:  # type: ignore[union-attr]
@@ -593,7 +600,8 @@ def cmd_videos_list(args) -> None:
         extra = sorted(remote_ids - {v.get("youtubeId") for v in listed})
         for vid in extra:
             print(f"  {vid}  on Steam but not listed in workshop.json")
-    print("Steam takes Workshop videos only as YouTube links: add one on the item page (Add/Edit videos) while signed in as the owner; this script sends nothing.")
+    print("`upload --yes` sends the listed videos as additional preview videos. If Steam does not list one after an upload, "
+          "add it by hand on the item page (Add/Edit videos) while signed in as the owner. This command sends nothing.")
 
 
 def cmd_images_upload(args) -> None:
@@ -786,6 +794,124 @@ def cmd_preview(args) -> None:
         raise Fail(f"{len(failed)} item(s) failed")
 
 
+# --------------------------------------------------------------------------- artwork (validation run)
+
+ARTWORK_NOTE = "中文：验证用美术作品。\nEnglish: Validation artwork item."  # the default change note of `artwork`
+ARTWORK_DESCRIPTION = "Private validation item for the Artwork check. Not for publication."
+UNVERIFIED = "unverified"
+# The fixed outcome list of `artwork`. Every one starts as unverified; a run changes it only on what it observed.
+ARTWORK_OUTCOMES = (
+    "creation",               # the Art item was created
+    "upload",                 # publish with the image returned DONE
+    "community configuration",  # Steam created an Art item for this app (creation is the only evidence)
+    "GIF accepted",           # the GIF was accepted and the read-back shows a preview URL (only for a .gif)
+    "read-back URL",          # Steam returned a preview URL for the item
+    "read-back visibility",   # Steam reads the item back as hidden (Private)
+    "[img] rendering",        # the URL renders in a description [img] tag: only a person looking at the item page can say
+)
+
+
+def artwork_report(outcomes: dict[str, tuple[str, str]]) -> None:
+    print("outcomes")
+    for name in ARTWORK_OUTCOMES:
+        state, detail = outcomes.get(name, (UNVERIFIED, "not run"))
+        print(f"  {name:<26} {state:<10} {detail}")
+
+
+def cmd_artwork(args) -> None:
+    if args.yes:
+        require_confirmed_write("artwork")  # refused before anything is read or sent
+    image = Path(args.image).expanduser().resolve()
+    if not image.is_file():
+        raise Fail(f"{image} is not a file")
+    if image.suffix.lower() not in PREVIEW_EXT:
+        raise Fail(f"{image.name}: the image must be one of {', '.join(sorted(PREVIEW_EXT))}")
+    size = image.stat().st_size
+    if size >= PREVIEW_BUDGET:
+        raise Fail(f"{image.name} is {size} bytes; Steam takes a preview file under {PREVIEW_BUDGET} bytes")
+    if len(args.title.encode("utf-8")) > MAX_TITLE:
+        raise Fail(f"the title is {len(args.title.encode('utf-8'))} UTF-8 bytes; Steam accepts at most {MAX_TITLE}")
+    changenote = args.changenote if args.changenote is not None else ARTWORK_NOTE
+    note_problems = locales.change_note_problems(changenote)
+    if note_problems:
+        raise Fail("change note for this run: " + "; ".join(note_problems) + f"\nexample:\n{locales.CHANGE_NOTE_EXAMPLE}")
+    print(f"app        {args.app_id}")
+    print("file type  Art")
+    print("visibility hidden (Private): the item is not public")
+    print(f"image      {image.name} ({size} bytes); the same file is the item's content and its preview")
+    print(f"title      {args.title}")
+    print(f"change note {changenote!r}")
+    if not args.yes:
+        print("dry run: nothing was sent to Steam. Re-run with --yes and WORKSHOP_WRITE_CONFIRMED=1 to create this private item.")
+        artwork_report({})
+        return
+    if shutil.which("node") is None:
+        raise Fail("node is not on PATH (steam-workshop.mjs needs Node.js)")
+    outcomes: dict[str, tuple[str, str]] = {}
+    gif = image.suffix.lower() == ".gif"
+    workdir = Path(tempfile.mkdtemp(prefix="artwork-"))
+    try:
+        content = workdir / "content"
+        content.mkdir()
+        shutil.copy2(image, content / image.name)
+        translations = workdir / "translations.json"
+        translations.write_text(json.dumps([{"language": "english", "title": args.title, "description": args.description or ARTWORK_DESCRIPTION}],
+                                           ensure_ascii=False, indent=2) + "\n", "utf-8")
+        cmd = ["node", str(STEAM_SCRIPT), "publish", "--app", str(args.app_id), "--item", "0", "--file-type", "art",
+               "--content", str(content), "--preview", str(image), "--translations", str(translations),
+               "--visibility", "hidden", "--changenote", changenote]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        sys.stdout.write(r.stdout)
+        sys.stderr.write(r.stderr)
+        error = (r.stderr.strip().splitlines() or [f"steam-workshop.mjs publish exited {r.returncode}"])[-1]
+        created = re.search(r"^ITEM_ID (\d+)$", r.stdout, re.M)
+        if created:
+            item = created.group(1)
+            outcomes["creation"] = ("verified", f"item {item} created with file type Art")
+            outcomes["community configuration"] = ("verified", "Steam created an Art item for this app")
+        else:
+            outcomes["creation"] = ("failed", error)
+            outcomes["community configuration"] = (UNVERIFIED, "the item was not created, so this is not known")
+        if created and r.returncode == 0 and re.search(r"^DONE \d+$", r.stdout, re.M):
+            outcomes["upload"] = ("verified", "publish returned DONE")
+        elif created:
+            outcomes["upload"] = ("failed", error)
+        if created:
+            info = subprocess.run(["node", str(STEAM_SCRIPT), "info", "--app", str(args.app_id), "--item", item],
+                                  capture_output=True, text=True)
+            line = next((x for x in info.stdout.splitlines() if x.startswith("ITEM_INFO ")), None)
+            if info.returncode != 0 or line is None:
+                outcomes["read-back URL"] = ("failed", info.stderr.strip() or "the read-back did not return the item")
+                outcomes["read-back visibility"] = ("failed", "the read-back did not return the item")
+            else:
+                readback = json.loads(line[len("ITEM_INFO "):])
+                url = readback.get("previewUrl")
+                if url:
+                    outcomes["read-back URL"] = ("verified", url)
+                else:
+                    outcomes["read-back URL"] = ("failed", "Steam returned no preview URL for the item")
+                visibility = readback.get("visibility")
+                if visibility == "hidden":
+                    outcomes["read-back visibility"] = ("verified", "Steam reads the item back as hidden (Private)")
+                else:
+                    outcomes["read-back visibility"] = ("failed", f"Steam reads the item back as {visibility!r}")
+                if gif and outcomes.get("upload", ("", ""))[0] == "verified" and url:
+                    outcomes["GIF accepted"] = ("verified", "Steam accepted the GIF and returns a preview URL")
+                elif gif and "upload" in outcomes:
+                    outcomes["GIF accepted"] = ("failed", "the GIF upload or read-back did not give a preview URL")
+        if not gif and "upload" in outcomes:
+            outcomes["GIF accepted"] = (UNVERIFIED, "the image is not a GIF; run again with a GIF to test animated acceptance")
+        outcomes["[img] rendering"] = (UNVERIFIED, "not checked by this run: place the returned URL in a description [img] tag and look at the item page")
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    artwork_report(outcomes)
+    if created:
+        print(f"the private item {item} stays on the account; delete it with workshop.deleteItem after the outcomes are recorded")
+    failed = [name for name, (state, _) in outcomes.items() if state == "failed"]
+    if failed:
+        raise Fail(f"{len(failed)} outcome(s) failed: {', '.join(failed)}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="workshop.py", description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -850,12 +976,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--yes", action="store_true", help="actually remove them on Steam")
     s.set_defaults(fn=cmd_images_remove)
 
-    s = sub.add_parser("videos", help="Workshop videos (YouTube links): list them (read-only; Steam is updated by hand)")
+    s = sub.add_parser("videos", help="Workshop videos (YouTube ids): list them (read-only; upload sends the listed ones)")
     videos = s.add_subparsers(dest="videos_cmd", required=True)
     s = videos.add_parser("list", help="list the videos in workshop.json with their YouTube links; --remote also compares with Steam")
     s.add_argument("item_dir")
     s.add_argument("--remote", action="store_true", help="read the item from Steam (needs the Steam client)")
     s.set_defaults(fn=cmd_videos_list)
+
+    s = sub.add_parser("artwork", help="validation: one private Art item with one image, read back from Steam (dry run unless --yes)")
+    s.add_argument("--app-id", type=int, required=True, help="Steam AppID of the game")
+    s.add_argument("--image", required=True, help="the one image to upload; use a GIF to test animated acceptance")
+    s.add_argument("--title", required=True, help="the English title of the private item (at most 128 UTF-8 bytes)")
+    s.add_argument("--description", help=f"the English description (default: {ARTWORK_DESCRIPTION!r})")
+    s.add_argument("--changenote", help=f"two-line bilingual change note (default: {ARTWORK_NOTE!r})")
+    s.add_argument("--yes", action="store_true", help="actually create the private item on Steam (also needs WORKSHOP_WRITE_CONFIRMED=1)")
+    s.set_defaults(fn=cmd_artwork)
     return parser
 
 

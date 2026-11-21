@@ -28,8 +28,8 @@ const client = {
   localplayer: { getName: () => 'tester', getSteamId: () => ({ steamId64: '76561190000000000' }) },
   apps: { isSubscribedApp: () => true },
   workshop: {
-    async createItem(appId) {
-      log({ call: 'createItem', appId });
+    async createItem(appId, fileType) {
+      log({ call: 'createItem', appId, fileType: fileType ?? null });
       return { itemId: BigInt(${FAKE_ITEM_ID}), needsToAcceptAgreement: mode === 'agreement' };
     },
     updateItemWithCallback(itemId, details, appId, ok, err) {
@@ -38,6 +38,7 @@ const client = {
         changeNote: details.changeNote ?? null, tags: details.tags ?? null, contentPath: details.contentPath ?? null,
         additionalPreviewPaths: details.additionalPreviewPaths ?? null, previewPath: details.previewPath ?? null,
         removeAdditionalPreviewIndexes: details.removeAdditionalPreviewIndexes ?? null,
+        additionalPreviewVideos: details.additionalPreviewVideos ?? null,
       });
       if (details.previewPath && mode !== 'preview-not-applied') {
         const s = readState();
@@ -864,14 +865,81 @@ test('videos list prints the YouTube link and, with --remote, which videos Steam
   assert.match(remote.out, /zzzzzzzzzzz\s+on Steam but not listed/);
 });
 
-test('the upload plan says videos are not part of the upload', { skip }, () => {
+test('the upload plan lists the videos it sends, and a confirmed upload sends each one once', { skip }, () => {
   const f = fixture();
   run(['init', f.item, '--app-id', '4348910', '--languages', 'english'], {}, f);
   fillIn(f);
   withVideos(f, [{ youtubeId: 'dQw4w9WgXcQ', title: 'Demo' }]);
-  const r = run(['upload', f.item], {}, f);
+  const plan = run(['upload', f.item], {}, f);
+  assert.equal(plan.code, 0, plan.text);
+  assert.match(plan.out, /videos\s+1 YouTube id\(s\) sent as additional preview videos: dQw4w9WgXcQ/);
+  assert.equal(calls(f).length, 0, 'the dry run sends nothing');
+  const sent = run(['upload', f.item, '--yes', '--changenote', CHANGE_NOTE], {}, f);
+  assert.equal(sent.code, 0, sent.text);
+  assert.deepEqual(calls(f).find((x) => x.call === 'update').additionalPreviewVideos, ['dQw4w9WgXcQ']);
+  // Steam already lists the video: the next upload does not send it again.
+  fs.writeFileSync(f.state, JSON.stringify({ previews: [{ originalFilename: '', urlOrVideoId: 'dQw4w9WgXcQ', previewType: 1 }] }));
+  fs.rmSync(f.log, { force: true });
+  const again = run(['upload', f.item, '--yes'], {}, f);
+  assert.equal(again.code, 0, again.text);
+  assert.match(again.out, /VIDEO_PRESENT dQw4w9WgXcQ/);
+  assert.equal(calls(f).find((x) => x.call === 'update').additionalPreviewVideos, null);
+});
+
+// ---- artwork: a private Art item with one image, a dry run by default, outcomes from the read-back ----
+function artImage(f) {
+  const image = path.join(f.base, 'art.gif');
+  fs.writeFileSync(image, 'GIF89a');
+  return image;
+}
+
+test('artwork without --yes prints the private Art plan, sends nothing and reports every outcome as unverified', { skip }, () => {
+  const f = fixture();
+  const r = run(['artwork', '--app-id', '4348910', '--image', artImage(f), '--title', 'Art check'], {}, f);
   assert.equal(r.code, 0, r.text);
-  assert.match(r.out, /videos\s+not part of this upload; Steam takes videos only as YouTube links/);
+  assert.match(r.out, /file type\s+Art/);
+  assert.match(r.out, /visibility\s+hidden \(Private\)/);
+  assert.match(r.out, /dry run: nothing was sent to Steam/);
+  assert.equal(calls(f).length, 0);
+  assert.match(r.out, /creation\s+unverified not run/);
+  assert.match(r.out, /community configuration\s+unverified not run/);
+  assert.match(r.out, /\[img\] rendering\s+unverified not run/);
+});
+
+test('artwork --yes without WORKSHOP_WRITE_CONFIRMED=1 is refused, names the variable and sends nothing', { skip }, () => {
+  const f = fixture();
+  const r = run(['artwork', '--app-id', '4348910', '--image', artImage(f), '--title', 'Art check', '--yes'], { WORKSHOP_WRITE_CONFIRMED: '0' }, f);
+  assert.notEqual(r.code, 0);
+  assert.match(r.err, /WORKSHOP_WRITE_CONFIRMED=1/);
+  assert.equal(calls(f).length, 0);
+});
+
+test('a confirmed artwork run creates a private Art item and reports each outcome from what it read back', { skip }, () => {
+  const f = fixture();
+  const r = run(['artwork', '--app-id', '4348910', '--image', artImage(f), '--title', 'Art check', '--yes'], {}, f);
+  assert.equal(r.code, 0, r.text);
+  const c = calls(f);
+  assert.deepEqual(c.find((x) => x.call === 'createItem'), { call: 'createItem', appId: 4348910, fileType: 1 });
+  const update = c.find((x) => x.call === 'update');
+  assert.equal(update.visibility, 2, 'the validation item is sent Private');
+  assert.match(update.previewPath, /art\.gif$/);
+  assert.match(r.out, new RegExp(`creation\\s+verified\\s+item ${FAKE_ITEM_ID} created`));
+  assert.match(r.out, /upload\s+verified/);
+  assert.match(r.out, /community configuration\s+verified/);
+  assert.match(r.out, /GIF accepted\s+verified/);
+  assert.match(r.out, /read-back URL\s+verified\s+https:\/\/steam\.example\/preview-1\.gif/);
+  assert.match(r.out, /read-back visibility\s+verified\s+Steam reads the item back as hidden/);
+  assert.match(r.out, /\[img\] rendering\s+unverified/, 'nothing observed the item page, so rendering stays unverified');
+});
+
+test('a refused artwork upload keeps the created item, marks the upload failed and exits 1', { skip }, () => {
+  const f = fixture();
+  const r = run(['artwork', '--app-id', '4348910', '--image', artImage(f), '--title', 'Art check', '--yes'], { FAKE_STEAM_MODE: 'fail-update' }, f);
+  assert.equal(r.code, 1, r.text);
+  assert.match(r.out, /creation\s+verified/);
+  assert.match(r.out, /upload\s+failed/);
+  assert.match(r.out, new RegExp(`the private item ${FAKE_ITEM_ID} stays on the account`));
+  assert.match(r.err, /outcome\(s\) failed: upload/);
 });
 
 // ---------------------------------------------------------------------------------------------- preview (main preview only)

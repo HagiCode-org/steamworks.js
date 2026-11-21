@@ -1,6 +1,6 @@
 ---
 name: steamworks-workshop-update
-description: "Update an existing Steam Workshop item with steamworks.js: change note, new content or preview, metadata changes, upload progress, and result checks, using the shared workshop.py upload from steamworks-workshop-publish. Use for 更新创意工坊项目 / 变更说明 / 上传进度 / publishedFileId / updateItem / 提交前核对 AppID 和项目 ID. Also covers the required items (dependencies) between Workshop items with addDependency / removeDependency: 依赖 / 前置 / required item.  Submits remote content; requires explicit confirmation of the target item and its content. Requires the steamworks-js setup first."
+description: "Update an existing Steam Workshop item with steamworks.js: change note, new content or preview, metadata changes, upload progress, and result checks, using the shared workshop.py upload from steamworks-workshop-publish. Use for 更新创意工坊项目 / 变更说明 / 上传进度 / publishedFileId / updateItem / 提交前核对 AppID 和项目 ID. Also covers the required items (dependencies) between Workshop items with addDependency / removeDependency: 依赖 / 前置 / required item; app dependencies (addAppDependency / getAppDependencies); and metadata, key-value tags, content descriptors and videos (updateItem fields). Submits remote content; requires explicit confirmation of the target item and its content. Requires the steamworks-js setup first."
 ---
 
 # steamworks-workshop-update
@@ -91,7 +91,36 @@ A Workshop item can require another item: Steam then installs the required item 
 
 The links change no content, title, description or version, so no upload is needed; and an `upload` never sends them. Dependencies point at an item, not at a version. A rerun after a partial failure is safe when it plans only the difference.
 
+## App dependencies (the app an item requires, such as a DLC)
+
+`workshop.addAppDependency(itemId, appId)` and `workshop.removeAppDependency(itemId, appId)` each resolve with the Steam result code (`1` is OK), and `workshop.getAppDependencies(itemId)` reads them back as `{ result, appIds, totalAppDependencies }`. Check the installed `client.d.ts` for these names first, as for the item dependencies above.
+
+**Impact: changes what subscribers of the item install.** Same rules as the item dependencies: show the plan, wait for the go-ahead, and read first.
+
+1. Read with `getAppDependencies(itemId)`. If `appIds` is shorter than `totalAppDependencies`, the list is incomplete: stop and report it. The paging is unverified against a live Steam client.
+2. Check the item is owned by the logged-in account and the `appId` is a real app. Never use a guessed value.
+3. Write one change at a time. A non-`1` result code is Steam's refusal and comes back as a resolved number, not a rejection: stop and report it. A call that never completes rejects and says the outcome is unknown, so read the item before retrying.
+4. Read back with `getAppDependencies(itemId)` and report the `appIds` you read.
+
+## Metadata, key-value tags, content descriptors and videos
+
+These are `updateItem` fields. Each is optional: a field that is left out keeps the item's current value.
+
+```js
+await client.workshop.updateItem(itemId, {
+  metadata: 'v2',                                   // developer metadata string
+  keyValueTags: { clear: true, remove: ['mode'], add: [{ key: 'mode', value: 'hard' }] },  // clear, then remove, then add
+  contentDescriptors: { remove: [2], add: [5] },    // WorkshopContentDescriptor values only: 1 to 5
+  additionalPreviewVideos: ['dQw4w9WgXcQ'],         // YouTube ids: 11 characters, not URLs
+}, appId)
+```
+
+- **Impact: submits remote content.** Show the planned fields and the item, then wait for the go-ahead. The steamworks.js call is the only route for metadata, key-value tags and content descriptors: `workshop.py upload` sends only the videos listed in `workshop.json` (and `--file-type` at creation), and it never sends these three.
+- **Refused before any Steam call:** a bad video id (named in the error), a NUL byte in `metadata`, or a descriptor outside 1 to 5.
+- **Read-back limit:** the typings expose no read for an item's metadata, key-value tags or content descriptors, so after the write only the result code is checked. Say so in the report, not "verified".
+- **Videos:** a video added this way is unverified on the item page until a live check. For a re-upload, add only the videos Steam does not list yet (`workshop.py videos list <item-dir> --remote`).
+
 ## Out of scope
 
 - Deleting an item (`deleteItem` exists in the typings) is not covered here. Only call it after the user names the item id and confirms the deletion in that message.
-- Votes: the checked typings do not expose them. Do not invent calls for them.
+- Votes, favorites and playtime tracking are the account's state, not the item's. They are in [`steamworks-workshop-client-state`](../steamworks-workshop-client-state/SKILL.md).

@@ -44,6 +44,17 @@ if (client.achievement.activate('ACHIEVEMENT')) {
 
 You can refer to the [declarations file](https://github.com/HagiCode-org/steamworks.js/blob/main/client.d.ts) to check the API support and get more detailed documentation of each function.
 
+### Not in scope: remote_storage publish and screenshots tagging
+
+These two parts of the SDK are deliberately not wrapped. This section records the decision and its reasons, so the question is not reopened without new facts. The public API did not change for it: `client.d.ts` has no remote_storage publish function and no screenshots tagging function.
+
+| Feature | Decision | Checked in the code or SDK headers | Reason | Unverified |
+| --- | --- | --- | --- | --- |
+| `remote_storage` publish (`PublishWorkshopFile`) | Exclude | The SDK header declares `PublishWorkshopFile` with the other remote storage calls. Nothing in this repository wraps or calls it. | The UGC calls this binding already wraps (`createItem`, `updateItem`, the dependency and preview calls) cover publishing. A second publish route would need its own tests and skill. | Whether Steam still accepts this route for current accounts. |
+| Screenshots tagging (`TagPublishedFile`) | Defer | The header declares `TagPublishedFile` on `ISteamScreenshots`. The `screenshots` namespace only hooks the screenshot hotkey. | The call needs a screenshot handle from the hooked hotkey flow. Without a use case in this repository, a wrapper would ship untested. Reopen it when a consumer needs it. | Whether a tag call succeeds and shows on the item page. It needs a running client. |
+
+Recommendation: keep both out of the public API. When screenshots tagging is needed, start with a live check on a private test item.
+
 ## Installation
 
 To use steamworks.js you don't have to build anything, just install it from npm:
@@ -172,6 +183,35 @@ await client.workshop.updateItemContent(itemId, '/abs/path/mod-folder', appId, '
 - Title, description, tags and visibility are not sent, so they stay as they are. To change them together with a file, keep using `updateItem`.
 - Neither helper reports upload progress. For a large content upload use `updateItemWithCallback`.
 
+### Creating items and the new update fields
+
+`createItem(appId?, fileType?)` creates an empty item. Without `fileType` it is a `Community` item, as before. The `WorkshopFileType` values are `Community`, `Art`, `Screenshot`, `Video`, `Collection`, `WebGuide` and `IntegratedGuide`.
+
+`updateItem` accepts these optional fields. A field left out keeps the item's current value:
+
+- `additionalPreviewVideos`: YouTube video IDs, 11 characters each, not URLs. A malformed ID rejects with the entry named, before anything is sent. Whether Steam shows a video added this way is **unverified** until a live run.
+- `metadata`: a developer metadata string.
+- `keyValueTags`: `{ clear?, remove?, add? }`, applied in the order clear, remove, add. `add` takes `{ key, value }` pairs and `remove` takes keys.
+- `contentDescriptors`: `{ remove?, add? }` of `WorkshopContentDescriptor` values, removals first. Only the five SDK values exist, so any other number is refused.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+const { WorkshopFileType, WorkshopContentDescriptor } = client.workshop
+
+const created = await client.workshop.createItem(appId, 1)  // 1 = WorkshopFileType.Art
+await client.workshop.updateItem(created.itemId, {
+  metadata: 'v2',
+  keyValueTags: { clear: true, add: [{ key: 'mode', value: 'hard' }] },
+  contentDescriptors: { add: [5] },                         // 5 = WorkshopContentDescriptor.AnyMatureContent
+  additionalPreviewVideos: ['dQw4w9WgXcQ'],
+}, appId)
+```
+
+- Each of these calls changes the item on Steam. Confirm the item and the change first.
+- The typings expose no read for an item's metadata, key-value tags or content descriptors, so after a write only the Steam result code can be checked.
+- `workshop.py upload` sends `--file-type` and the YouTube videos listed in `workshop.json`. It does not send metadata, key-value tags or content descriptors; those are steamworks.js calls only.
+
 ## Workshop Item Dependencies
 
 A Workshop item can require another item, so Steam installs the required item along with it. `addDependency` and `removeDependency` take the parent and the child as `bigint` ids and resolve with the Steam result code. `1` means OK. Any other code is a Steam failure reason, and it arrives as a resolved number, not a rejection.
@@ -195,6 +235,34 @@ const removed = await client.workshop.removeDependency(modId, requiredId)
 
 - Both calls need a running, logged-in Steam client, and the parent must be an item the logged-in account owns.
 - An id that is negative or does not fit in 64 bits rejects before any Steam call. A failed call with no completion also rejects, and the error says the outcome is unknown, so check the item before retrying.
+
+### App dependencies
+
+An item can also require an app, such as a DLC. `addAppDependency(itemId, appId)` and `removeAppDependency(itemId, appId)` resolve with the Steam result code, the same way as the item calls above.
+
+`getAppDependencies(itemId)` resolves with `{ result, appIds, totalAppDependencies }`. Steam sends the list in pages of up to 32, and the binding collects them until the reported total is reached. If `appIds` is shorter than `totalAppDependencies`, the list is incomplete. The paging follows the SDK header, and it is **unverified** against a live Steam client.
+
+## Workshop User Actions
+
+These calls act for the logged-in user on Steam, so they change that user's state and not only the item. Each one resolves when Steam confirms it. `getUserItemVote` is the only one that reads.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+await client.workshop.setUserItemVote(itemId, true)        // vote up; false votes down
+const vote = await client.workshop.getUserItemVote(itemId) // { votedUp, votedDown, skipped }
+
+await client.workshop.addItemToFavorites(itemId)           // appId defaults to the client's app
+await client.workshop.removeItemFromFavorites(itemId)
+
+await client.workshop.startPlaytimeTracking([itemId])      // the list must not be empty
+await client.workshop.stopPlaytimeTracking([itemId])
+```
+
+- Item ID 0, a negative id and an empty playtime list are refused before any Steam call.
+- Start and stop playtime tracking in pairs. The SDK header describes these calls as tracking the user's playtime for the listed items; that behavior is **unverified** against a live client.
+- These calls need a running, logged-in Steam client.
 
 ## Workshop Known Game Versions
 

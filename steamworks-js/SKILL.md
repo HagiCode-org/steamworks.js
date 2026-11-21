@@ -33,16 +33,20 @@ This skill owns the shared setup for every `steamworks-*` skill. It does not car
 | Create an item, first upload of content and preview, set title/description/tags/visibility; shared `workshop.py` and per-item `workshop/` layout | [`steamworks-workshop-publish`](../steamworks-workshop-publish/SKILL.md) | Submits remote content |
 | Change an existing item, change note, upload progress and result check | [`steamworks-workshop-update`](../steamworks-workshop-update/SKILL.md) | Submits remote content |
 | Required items (dependencies) between Workshop items: read the links (`returnChildren`), add or remove them (`addDependency`, `removeDependency`) | [`steamworks-workshop-update`](../steamworks-workshop-update/SKILL.md) | Submits remote content: changes what subscribers of the item install |
-| Subscribe, unsubscribe, download, install location, item state | [`steamworks-workshop-client-state`](../steamworks-workshop-client-state/SKILL.md) | Changes account subscriptions or local files |
+| App dependencies of an item (`addAppDependency`, `removeAppDependency`, `getAppDependencies`); metadata, key-value tags, content descriptors and videos on an item (`updateItem` fields) | [`steamworks-workshop-update`](../steamworks-workshop-update/SKILL.md) | Submits remote content |
+| Read an item's app dependencies (`getAppDependencies`) or the user's vote (`getUserItemVote`) | [`steamworks-workshop-query`](../steamworks-workshop-query/SKILL.md) | Read-only |
+| Subscribe, unsubscribe, download, install location, item state; the user's votes, favorites and playtime tracking | [`steamworks-workshop-client-state`](../steamworks-workshop-client-state/SKILL.md) | Changes account subscriptions, votes, favorites or local files |
 | Report of our published mods per game: one row per mod with subscriptions and favorites, change against the previous saved day in the user's cache directory | [`steamworks-workshop-stats`](../steamworks-workshop-stats/SKILL.md) | Read-only for Steam; writes its own daily cache files |
 
 Other Steamworks modules (cloud, stats/achievements, identity/social, overlay/input) are planned as later phases and have no skill yet. Do not improvise them from this skill.
 
+Two SDK areas are deliberately not wrapped: remote_storage publish and screenshot tagging. The decision and its reasons are in the README section "Not in scope: remote_storage publish and screenshots tagging". Do not add calls for them without reopening that decision.
+
 ## 5. Operation impact rules
 
 - **Read-only:** queries, `state`, `installInfo`, `downloadInfo`, `getSubscribedItems`. Run freely.
-- **Account or local state:** `subscribe`, `unsubscribe`, `download`. Show the target `publishedFileId` and the expected effect, then wait for the user's go-ahead.
-- **Remote submission:** `createItem`, `updateItem`, `updateItemWithCallback`. Before calling, state the AppID, the `publishedFileId` (or that a new item will be created), the content path, and the preview path. Steam documents that a submitted update cannot be cancelled, so get explicit confirmation of the exact content. Removing screenshots is also an `updateItem`, with `removeAdditionalPreviewIndexes` (0.1.5 or later): 0-based indexes into `additionalPreviews` as read just before the call. Confirm the item and the file names first; the shared scripts do this through `workshop.py images remove`.
+- **Account or local state:** `subscribe`, `unsubscribe`, `download`, `setUserItemVote`, `addItemToFavorites`, `removeItemFromFavorites`, `startPlaytimeTracking`, `stopPlaytimeTracking`. Show the target `publishedFileId` and the expected effect, then wait for the user's go-ahead.
+- **Remote submission:** `createItem` (with an optional `fileType`), `updateItem` (including its metadata, key-value tag, content descriptor and video fields), `updateItemWithCallback`, `addAppDependency`, `removeAppDependency`. Before calling, state the AppID, the `publishedFileId` (or that a new item will be created), the content path, and the preview path. Steam documents that a submitted update cannot be cancelled, so get explicit confirmation of the exact content. Removing screenshots is also an `updateItem`, with `removeAdditionalPreviewIndexes` (0.1.5 or later): 0-based indexes into `additionalPreviews` as read just before the call. Confirm the item and the file names first; the shared scripts do this through `workshop.py images remove`.
 - **Destructive:** `deleteItem` appears in the typings but has no phase-1 skill. Do not call it without a per-item confirmation from the user that names the id.
 - Verify the outcome with a read (`getItem`, `state`) after every write, and report the evidence, not the expectation.
 

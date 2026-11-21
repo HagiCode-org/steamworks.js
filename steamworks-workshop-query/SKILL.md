@@ -13,6 +13,8 @@ Read-only. Nothing here changes the account, the Workshop, or local files. Compl
 - `workshop.getItems(ids[], config?)`: a batch of ids; returns `items` and `wasCached`.
 - `workshop.getAllItems(page, queryType, itemType, creatorAppId, consumerAppId, config?)`: the general query. `queryType` and `itemType` are the `UGCQueryType` and `UGCType` const enums.
 - `workshop.getUserItems(page, accountId, listType, itemType, sortOrder, appIds, config?)`: items for one user. `appIds` takes `{ creator?, consumer? }`.
+- `workshop.getAppDependencies(itemId)`: the apps an item requires, as `{ result, appIds, totalAppDependencies }`. If `appIds` is shorter than `totalAppDependencies`, the list is incomplete; report that instead of treating it as the full list. Paging is unverified against a live client.
+- `workshop.getUserItemVote(itemId)`: the logged-in user's vote, as `{ votedUp, votedDown, skipped }`. It reads the account's state, not the item's, so say whose vote it is when you report it.
 
 ## Query config
 

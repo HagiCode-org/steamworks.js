@@ -25,12 +25,13 @@ export const guidePages = [
   {
     slug: "guide/workshop",
     title: "Steam Workshop",
-    description: "Screenshots, previews, content updates, item dependencies, known game versions and multilingual items.",
+    description: "Screenshots, previews, content updates, item and app dependencies, user actions (votes, favorites, playtime), known game versions and multilingual items.",
     order: 3,
     sections: [
       "Workshop Screenshots (Additional Previews)",
       "Workshop Preview and Content Updates",
       "Workshop Item Dependencies",
+      "Workshop User Actions",
       "Workshop Known Game Versions",
       "Workshop Multilingual Support",
     ],

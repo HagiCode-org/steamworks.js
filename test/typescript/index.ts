@@ -30,6 +30,41 @@ export async function uploadContentOnly(itemId: bigint, contentDir: string): Pro
 	return result.needsToAcceptAgreement;
 }
 
+// Creates an Artwork item, then sets metadata, key-value tags, a content descriptor and a video preview in one update.
+// The enum values are the SDK numbers listed in client.d.ts.
+export async function createArtItemWithFields(appId: number, videoId: string): Promise<bigint> {
+	const client = steamworks.init(appId);
+	const created: workshop.UgcResult = await client.workshop.createItem(appId, 1 as workshop.WorkshopFileType);
+	const updated: workshop.UgcResult = await client.workshop.updateItem(created.itemId, {
+		metadata: "v2",
+		keyValueTags: { clear: true, remove: ["mode"], add: [{ key: "mode", value: "hard" }] },
+		contentDescriptors: { add: [5 as workshop.WorkshopContentDescriptor] },
+		additionalPreviewVideos: [videoId],
+	}, appId);
+	return updated.itemId;
+}
+
+// Votes, reads the vote back, and manages favorites and playtime tracking; every call resolves when Steam confirms it
+export async function voteFavoriteAndTrack(appId: number, itemId: bigint): Promise<boolean> {
+	const client = steamworks.init(appId);
+	await client.workshop.setUserItemVote(itemId, true);
+	const vote: workshop.UserItemVoteState = await client.workshop.getUserItemVote(itemId);
+	await client.workshop.addItemToFavorites(itemId, appId);
+	await client.workshop.startPlaytimeTracking([itemId]);
+	await client.workshop.stopPlaytimeTracking([itemId]);
+	await client.workshop.removeItemFromFavorites(itemId, appId);
+	return vote.votedUp;
+}
+
+// Adds and removes an app dependency, then lists the app dependencies of the item
+export async function appDependencies(appId: number, itemId: bigint): Promise<workshop.AppDependencies> {
+	const client = steamworks.init(appId);
+	const added: number = await client.workshop.addAppDependency(itemId, appId);
+	const removed: number = await client.workshop.removeAppDependency(itemId, appId);
+	console.log(`addAppDependency ${added}, removeAppDependency ${removed}`);
+	return client.workshop.getAppDependencies(itemId);
+}
+
 // Example of using the friends namespace: lists friends who are online and not in a game
 export async function listOnlineFriends(): Promise<string[]> {
 	const client = steamworks.init(480);
