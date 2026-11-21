@@ -15,7 +15,7 @@ This project is a fork of the upstream [steamworks.js](https://github.com/ceifa/
 It exists for my own development work, not as a general replacement for upstream. It is shaped around two needs:
 
 * **Working well with coding agents.** The repository carries agent guidance (`AGENTS.md`), task-oriented skills for Steam Workshop work (`steamworks-js/` and the `steamworks-workshop-*` folders), and a documentation site built from this README and those skills.
-* **Covering the Steamworks features my projects use.** Workshop publishing and updates (additional previews, preview-only and content-only updates, item dependencies, known game versions, per-language titles and descriptions), plus friends, stats and leaderboards, networking sockets/messages/utils, the server browser, timeline, screenshots and Remote Play.
+* **Covering the Steamworks features my projects use.** Steam Workshop (UGC) is the most complete area: creating items of any file type, publishing and updating them (additional previews and videos, preview-only and content-only updates, metadata, key-value tags, content descriptors, known game versions, per-language titles and descriptions), item and app dependencies, and the logged-in user's votes, favorites and playtime tracking. Beyond Workshop it covers friends, stats and leaderboards, networking sockets/messages/utils, the server browser, timeline, screenshots and Remote Play.
 
 What that means in practice:
 
@@ -43,6 +43,27 @@ if (client.achievement.activate('ACHIEVEMENT')) {
 ```
 
 You can refer to the [declarations file](https://github.com/HagiCode-org/steamworks.js/blob/main/client.d.ts) to check the API support and get more detailed documentation of each function.
+
+### What is covered
+
+Every namespace below is on the client returned by `init()`. Every function, with its parameters, return value and failure cases, is in the [API reference](https://steamworks.hagicode.com/api/), which is rendered from the JSDoc in `client.d.ts`. Most calls need a running, logged-in Steam client. Anything marked **unverified** has not been run against a live client yet.
+
+| Area | Namespaces | Where to read more |
+| --- | --- | --- |
+| Steam Workshop (UGC) | `workshop` | The Workshop sections below, and the agent skills for publishing, updating, querying and client state |
+| Friends and identity | `friends`, `localplayer`, `auth` | [Friends](#friends); the API reference for the rest |
+| Stats, achievements, leaderboards | `stats`, `achievement`, `leaderboard` | [Stats, Achievements and Leaderboards](#stats-achievements-and-leaderboards) |
+| Networking | `networking`, `networkingSockets`, `networkingMessages`, `networkingUtils` | [Networking](#networking-networking-and-the-new-namespaces) |
+| Servers, lobbies, Remote Play | `matchmaking`, `matchmakingServers`, `remotePlay` | [Server Browser, Timeline, Screenshots and Remote Play](#server-browser-timeline-screenshots-and-remote-play); lobbies are in the API reference |
+| Timeline and screenshots | `timeline`, `screenshots` | Same section |
+| App, overlay, input, cloud, utilities | `apps`, `overlay`, `input`, `cloud`, `utils`, `callback` | [Supplemental Functions](#supplemental-functions); the API reference for the rest |
+
+What the Workshop namespace can do today:
+
+* **Read**: `getItem`, `getItems`, `getAllItems`, `getUserItems`, with additional previews, supported game versions and dependency links on request.
+* **Create and update**: `createItem` (any `WorkshopFileType`), `updateItem` and its preview-only and content-only helpers, with title and description per language, tags, visibility, metadata, key-value tags, content descriptors, screenshots, YouTube videos and game-version ranges.
+* **Dependencies**: required items (`addDependency`, `removeDependency`) and required apps (`addAppDependency`, `removeAppDependency`, `getAppDependencies`).
+* **The logged-in user**: subscribe, download and install info, votes, favorites and playtime tracking.
 
 ### Not in scope: remote_storage publish and screenshots tagging
 
