@@ -17,6 +17,7 @@ const mainRef = "github.ref == 'refs/heads/main'";
 const docsPaths = [
   "docs/**",
   "README.md",
+  "client.d.ts",
   "*/SKILL.md",
   ".github/gh-pages/**",
   ".github/workflows/docs-ci.yml",
