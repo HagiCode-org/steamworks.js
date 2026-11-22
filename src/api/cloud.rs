@@ -14,24 +14,34 @@ pub mod cloud {
         pub size: BigInt,
     }
 
+    /// Checks whether Steam Cloud is enabled for the user's account. This is separate from the app setting (`isEnabledForApp()`).
+    /// @returns true if enabled for the account, otherwise false.
     #[napi]
     pub fn is_enabled_for_account() -> bool {
         let client = crate::client::get_client();
         client.remote_storage().is_cloud_enabled_for_account()
     }
 
+    /// Checks whether Steam Cloud is enabled for the current app. This is separate from the account setting (`isEnabledForAccount()`).
+    /// @returns true if enabled for the app, otherwise false.
     #[napi]
     pub fn is_enabled_for_app() -> bool {
         let client = crate::client::get_client();
         client.remote_storage().is_cloud_enabled_for_app()
     }
 
+    /// Turns Steam Cloud on or off for the current app. It does not change the account setting. Returns nothing, and the binding does not report whether Steam applied the change.
+    /// @param enabled - true to enable Steam Cloud for the app, false to disable it.
     #[napi]
     pub fn set_enabled_for_app(enabled: bool) {
         let client = crate::client::get_client();
         client.remote_storage().set_cloud_enabled_for_app(enabled)
     }
 
+    /// Reads a Steam Cloud file as UTF-8 text. Needs `init()`.
+    /// Rejects with "Failed to read file" when the file cannot be read or its bytes are not valid UTF-8. Unverified against a live Steam client: a missing file is read as empty text on this code path.
+    /// @param name - The cloud file name.
+    /// @returns the file content as a string.
     #[napi]
     pub fn read_file(name: String) -> Result<String, Error> {
         let client = crate::client::get_client();
@@ -48,6 +58,11 @@ pub mod cloud {
         }
     }
 
+    /// Writes text to a Steam Cloud file as UTF-8, replacing its previous content. Needs `init()`.
+    /// The write is committed when the write stream closes, which happens before this call returns.
+    /// @param name - The cloud file name.
+    /// @param content - Text to write, encoded as UTF-8.
+    /// @returns true if the content was accepted by the write stream, false if writing failed. The commit result is not reported. Unverified against a live Steam client whether a failed commit is visible.
     #[napi]
     pub fn write_file(name: String, content: String) -> bool {
         let client = crate::client::get_client();
@@ -57,6 +72,9 @@ pub mod cloud {
         file.write().write_all(buf).is_ok()
     }
 
+    /// Deletes a Steam Cloud file both locally and in the cloud. Needs `init()`.
+    /// @param name - The cloud file name.
+    /// @returns true if a file was deleted, false if none was.
     #[napi]
     pub fn delete_file(name: String) -> bool {
         let client = crate::client::get_client();
@@ -65,6 +83,9 @@ pub mod cloud {
         file.delete()
     }
 
+    /// Checks whether a Steam Cloud file exists. Needs `init()`.
+    /// @param name - The cloud file name.
+    /// @returns true if the file exists, otherwise false.
     #[napi]
     pub fn file_exists(name: String) -> bool {
         let client = crate::client::get_client();
@@ -73,6 +94,8 @@ pub mod cloud {
         file.exists()
     }
 
+    /// Lists the Steam Cloud files of the current app. Needs `init()`.
+    /// @returns an array of entries with `name` and `size` fields, where size is the file size in bytes as a BigInt. The array is empty when there are no files.
     #[napi]
     pub fn list_files() -> Vec<FileInfo> {
         let client = crate::client::get_client();

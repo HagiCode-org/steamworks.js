@@ -14,6 +14,7 @@ pub mod callback {
 
     #[napi]
     impl Handle {
+        /// Stops the handler registered for this Handle from being called. Calling it again does nothing.
         #[napi]
         pub fn disconnect(&mut self) {
             // The CallbackHandle automatically disconnects when dropped
@@ -49,6 +50,11 @@ pub mod callback {
         ValidateAuthTicketResponse,
     }
 
+    /// Registers a handler for a Steam callback. Needs `init()`.
+    /// The handler receives each callback payload as a JSON-compatible value on the JavaScript event loop. Steam events are dispatched only while `runCallbacks()` runs.
+    /// @param steamCallback - The callback kind to listen for.
+    /// @param handler - Called with each payload of that callback.
+    /// @returns a Handle; call `disconnect()` on it to stop the handler.
     #[napi(ts_generic_types = "C extends keyof import('./callbacks').CallbackReturns")]
     pub fn register(
         #[napi(ts_arg_type = "C")] steam_callback: SteamCallback,

@@ -36,6 +36,11 @@ pub mod networking {
         ReliableWithBuffering,
     }
 
+    /// Sends a packet to another user over Steam peer-to-peer networking.
+    /// @param steamId64 - recipient SteamID64 as a BigInt
+    /// @param sendType - delivery mode; each mode has its own size limit
+    /// @param data - packet payload
+    /// @returns `true` when Steam queued the packet
     #[napi]
     pub fn send_p2p_packet(
         steam_id64: BigInt,
@@ -56,6 +61,8 @@ pub mod networking {
         Ok(result)
     }
 
+    /// Checks whether a packet is waiting to be read on channel 0.
+    /// @returns the size in bytes of the next packet, or `0` when none is waiting
     #[napi]
     pub fn is_p2p_packet_available() -> i32 {
         let client = crate::client::get_client();
@@ -65,6 +72,9 @@ pub mod networking {
             .unwrap_or_default() as i32
     }
 
+    /// Reads the next waiting packet on channel 0.
+    /// @param size - size of the receive buffer in bytes
+    /// @returns `data` (the buffer), `size` (bytes read) and `steamId` of the sender; rejects with `No packet available` when none is waiting
     #[napi]
     pub fn read_p2p_packet(size: i32) -> Result<P2PPacket, Error> {
         let client = crate::client::get_client();
@@ -86,6 +96,8 @@ pub mod networking {
             })
     }
 
+    /// Accepts a peer-to-peer session request from a user. Call it in response to a session request from that user.
+    /// @param steamId64 - SteamID64 of the user as a BigInt
     #[napi]
     pub fn accept_p2p_session(steam_id64: BigInt) {
         let client = crate::client::get_client();
@@ -94,6 +106,12 @@ pub mod networking {
             .accept_p2p_session(SteamId::from_raw(steam_id64.get_u64().1));
     }
 
+    /// Sends a packet to another user on a specific channel. Each channel is an independent stream.
+    /// @param steamId64 - recipient SteamID64 as a BigInt
+    /// @param sendType - delivery mode; each mode has its own size limit
+    /// @param data - packet payload
+    /// @param channel - channel number
+    /// @returns `true` when Steam queued the packet
     #[napi]
     pub fn send_p2p_packet_on_channel(
         steam_id64: BigInt,

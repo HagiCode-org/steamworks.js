@@ -1,6 +1,6 @@
 ---
 title: steamworks.js
-description: Node.js and Electron bindings for the Steamworks SDK, for Steam Workshop, achievements, stats, cloud, overlay and networking.
+description: Node.js and Electron bindings for the Steamworks SDK, with a full Steam Workshop (UGC) toolkit plus friends, stats, leaderboards, networking, Remote Play and agent skills.
 ---
 
 Use the Steamworks SDK from Node.js or Electron. The package wraps the native SDK and ships typed declarations.
@@ -13,6 +13,21 @@ Install it with npm:
 npm i @hagicode/steamworks.js
 ```
 
-- [Getting started](/guide/getting-started/) covers the API, installation and the Electron setup.
-- [Steam Workshop](/guide/workshop/) covers screenshots, previews, content updates, item dependencies and multilingual items.
+## What you can do with it
+
+- **Steam Workshop (UGC).** Create items of any file type, publish and update them, and manage their previews, screenshots, videos, metadata, key-value tags, content descriptors, game-version ranges and per-language text. Link items to the items and apps they require. Act as the logged-in user: subscribe, download, vote, favorite and track playtime.
+- **Friends and identity.** Read the friend list, states and avatars, send game invites, and get session tickets.
+- **Stats, achievements and leaderboards.** Float stats, global unlock percentages, and leaderboard uploads and downloads.
+- **Networking.** The original P2P packet API, plus Networking Sockets, Messages and Utils.
+- **Servers and play together.** Server browser queries, lobbies, Remote Play sessions and invites, the Steam timeline and screenshots.
+- **Agent skills.** Task guides that let a coding agent publish, update, query and report on Workshop items with confirmation before every write.
+
+Anything marked **unverified** in the guides has not been run against a live Steam client yet.
+
+## Where to start
+
+- [Getting started](/guide/getting-started/) covers the API, what is covered, installation and the Electron setup.
+- [Steam Workshop](/guide/workshop/) covers screenshots, previews, content updates, item fields, item and app dependencies, user actions, game versions and multilingual items.
+- [Friends, stats and achievements](/guide/social-and-stats/) and [Networking and more](/guide/networking/) cover the rest of the API.
+- [API reference](/api/) lists every function with its parameters, return value and failure cases. It is generated from the doc comments in the source, so it matches the installed typings.
 - [Agent skills](/skills/steamworks-js/) are task guides for Workshop publishing, updates, queries, client state and stats.

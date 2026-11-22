@@ -13,6 +13,8 @@ pub mod screenshots {
         client.screenshots().hook_screenshots(hook);
     }
 
+    /// Checks whether the screenshot hotkey is currently hooked by the game (see `hookScreenshots`).
+    /// @returns `true` when hooked, otherwise `false`
     #[napi]
     pub fn is_screenshots_hooked() -> bool {
         let client = crate::client::get_client();

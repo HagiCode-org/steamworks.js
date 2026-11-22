@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - "README.md"
+      - "client.d.ts"
       - "*/SKILL.md"
       - ".github/gh-pages/**"
       - ".github/workflows/docs-ci.yml"

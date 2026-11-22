@@ -12,7 +12,9 @@ pub mod workshop {
 
     #[napi(object)]
     pub struct UgcResult {
+        /// The Workshop item id the update or creation applies to.
         pub item_id: BigInt,
+        /// True when Steam reports that the account still has to accept the Workshop legal agreement.
         pub needs_to_accept_agreement: bool,
     }
 
@@ -129,17 +131,25 @@ pub mod workshop {
 
     #[napi(object)]
     pub struct UgcUpdate {
+        /// New title of the item, in the language given by `language`.
         pub title: Option<String>,
+        /// New description of the item, in the language given by `language`.
         pub description: Option<String>,
+        /// Note shown in the item's change history for this update.
         pub change_note: Option<String>,
+        /// Absolute path of an image file that replaces the main preview.
         pub preview_path: Option<String>,
         /// Image files appended to the item's additional previews (screenshots).
         pub additional_preview_paths: Option<Vec<String>>,
         /// 0-based indexes of additional previews to remove, as listed in `additionalPreviews`.
         pub remove_additional_preview_indexes: Option<Vec<u32>>,
+        /// Absolute path of a folder whose files become the item's content.
         pub content_path: Option<String>,
+        /// Tags for the item. When given, they replace the item's tag list.
         pub tags: Option<Vec<String>>,
+        /// Who can see the item: Public, FriendsOnly, Private or Unlisted.
         pub visibility: Option<UgcItemVisibility>,
+        /// Steam language code (for example `english` or `schinese`) that `title` and `description` are written in. Left out, the README says it is treated as `english`.
         pub language: Option<String>,
         /// Oldest game version (Steam branch, e.g. `open_beta`) the item is valid for.
         /// Set either required-version field to change the range; the unset end becomes open.
@@ -356,6 +366,22 @@ pub mod workshop {
         })
     }
 
+    /// Updates an existing Workshop item on Steam. Every field of `updateDetails` is optional: a field
+    /// that is left out keeps the item's current value, so a call with only `previewPath` changes only
+    /// the preview. The fields are checked first, and a bad YouTube video id or a string with a NUL byte
+    /// rejects with the entry named, before anything is sent.
+    ///
+    /// Once submitted, the change is applied to the item on Steam and cannot be cancelled. A running,
+    /// logged-in Steam client is needed.
+    ///
+    /// Resolves with the item id and `needsToAcceptAgreement`. Rejects when the update cannot be started,
+    /// when Steam returns an error, or when no completion arrives; in that last case the outcome is
+    /// unknown, so read the item before retrying.
+    ///
+    /// @param itemId - the Workshop item to update (its published file id)
+    /// @param updateDetails - the fields to change; see `UgcUpdate`
+    /// @param appId - defaults to the app id the client was initialized with
+    /// @returns the item id and whether the account still has to accept the Workshop legal agreement
     #[napi]
     pub async fn update_item(
         item_id: BigInt,
@@ -503,6 +529,27 @@ pub mod workshop {
         })
     }
 
+    /// Updates an existing Workshop item on Steam, like `updateItem`, but reports the outcome through
+    /// callbacks instead of a promise. The call returns at once; the work continues in the background.
+    /// Its fields are checked the same way as in `updateItem`.
+    ///
+    /// `successCallback` receives the `UgcResult`. `errorCallback` receives every failure, both the
+    /// check that runs before anything is sent and the errors Steam reports later. Nothing is thrown.
+    ///
+    /// `progressCallback` receives an `UpdateProgress` right away and then every
+    /// `progressCallbackIntervalMs`, until the status is `Invalid` or `CommittingChanges`. The units of
+    /// `progress` and `total` are unverified against a live Steam client.
+    ///
+    /// Once submitted, the change is applied to the item on Steam and cannot be cancelled. A running,
+    /// logged-in Steam client is needed.
+    ///
+    /// @param itemId - the Workshop item to update (its published file id)
+    /// @param updateDetails - the fields to change; see `UgcUpdate`
+    /// @param appId - defaults to the app id the client was initialized with
+    /// @param successCallback - called with the `UgcResult` when Steam completes the update
+    /// @param errorCallback - called with an `Error` when the update is refused or fails
+    /// @param progressCallback - optional; called with the `UpdateProgress` while the update runs
+    /// @param progressCallbackIntervalMs - milliseconds between progress reports; defaults to 1000
     #[napi]
     pub fn update_item_with_callback(
         item_id: BigInt,
@@ -714,8 +761,17 @@ pub mod workshop {
             .collect::<Vec<_>>()
     }
 
-    // Deletes an item
-    // @returns true or false
+    /// Permanently deletes a Workshop item on Steam. The item is removed from the Workshop; the deletion
+    /// cannot be cancelled once it has been sent. A running, logged-in Steam client is needed.
+    ///
+    /// The code does not check ownership first; Steam decides whether the account may delete the item.
+    ///
+    /// Resolves with no value once Steam confirms the deletion. Rejects when Steam returns an error, or
+    /// when no completion arrives; in that last case the outcome is unknown, so read the item before
+    /// retrying.
+    ///
+    /// @param itemId - the Workshop item to delete (its published file id)
+    /// @returns resolves with no value once Steam confirms the deletion
     #[napi]
     pub async fn delete_item(item_id: BigInt) -> Result<(), Error> {
         let client = crate::client::get_client();

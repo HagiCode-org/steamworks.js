@@ -353,11 +353,17 @@ pub mod workshop {
     #[derive(Debug)]
     #[napi(object)]
     pub struct WorkshopItem {
+        /// The Workshop item's published file id.
         pub published_file_id: BigInt,
+        /// The app id that created the item.
         pub creator_app_id: Option<u32>,
+        /// The app id that uses the item.
         pub consumer_app_id: Option<u32>,
+        /// The item's title.
         pub title: String,
+        /// The item's description.
         pub description: String,
+        /// The Steam account that owns the item.
         pub owner: PlayerSteamId,
         /// Time created in unix epoch seconds format
         pub time_created: u32,
@@ -365,17 +371,28 @@ pub mod workshop {
         pub time_updated: u32,
         /// Time when the user added the published item to their list (not always applicable), provided in Unix epoch format (time since Jan 1st, 1970).
         pub time_added_to_user_list: u32,
+        /// Who can see the item: Public, FriendsOnly, Private or Unlisted.
         pub visibility: UgcItemVisibility,
+        /// Whether Steam has banned the item.
         pub banned: bool,
+        /// Whether Steam has accepted the item for use.
         pub accepted_for_use: bool,
+        /// The item's tags.
         pub tags: Vec<String>,
+        /// Whether Steam cut the tag list short.
         pub tags_truncated: bool,
         pub url: String,
+        /// Number of upvotes the item has.
         pub num_upvotes: u32,
+        /// Number of downvotes the item has.
         pub num_downvotes: u32,
+        /// Number of required items the item has.
         pub num_children: u32,
+        /// URL of the item's main preview image, when Steam returns one.
         pub preview_url: Option<String>,
+        /// Counts for the item, such as subscriptions and favorites.
         pub statistics: WorkshopItemStatistic, // Is it necessary to design this as optional?
+        /// Ids of the item's required items. Present only with `returnChildren`.
         pub children: Option<Vec<BigInt>>,
         /// Additional preview media (images, videos, etc.) for the workshop item
         pub additional_previews: Option<Vec<AdditionalPreview>>,
@@ -444,9 +461,13 @@ pub mod workshop {
     #[derive(Debug)]
     #[napi(object)]
     pub struct WorkshopPaginatedResult {
+        /// The entries of this page; `null` where Steam returned no record.
         pub items: Vec<Option<WorkshopItem>>,
+        /// The number of entries Steam returned on this page.
         pub returned_results: u32,
+        /// The number of matches across all pages.
         pub total_results: u32,
+        /// Whether the answer came from Steam's cache.
         pub was_cached: bool,
     }
 
@@ -477,7 +498,9 @@ pub mod workshop {
     #[derive(Debug)]
     #[napi(object)]
     pub struct WorkshopItemsResult {
+        /// One entry per record Steam returned; `null` where Steam returned no record.
         pub items: Vec<Option<WorkshopItem>>,
+        /// Whether the answer came from Steam's cache.
         pub was_cached: bool,
     }
 
@@ -506,18 +529,31 @@ pub mod workshop {
     #[derive(Debug)]
     #[napi(object)]
     pub struct WorkshopItemQueryConfig {
+        /// Oldest cached answer Steam may return, in seconds.
         pub cached_response_max_age: Option<u32>,
+        /// Return the item's developer metadata.
         pub include_metadata: Option<bool>,
+        /// Return the long description of the item.
         pub include_long_description: Option<bool>,
+        /// Fill `additionalPreviews` on each returned item.
         pub include_additional_previews: Option<bool>,
+        /// Return only the item ids, not the item details.
         pub only_ids: Option<bool>,
+        /// Return only the total number of matches.
         pub only_total: Option<bool>,
+        /// Steam language code for the returned title and description, such as `schinese`.
         pub language: Option<String>,
+        /// Match items that have any of the required tags, instead of all of them.
         pub match_any_tag: Option<bool>,
+        /// Tags an item must have.
         pub required_tags: Option<Vec<String>>,
+        /// Tags an item must not have.
         pub excluded_tags: Option<Vec<String>>,
+        /// Full-text search string.
         pub search_text: Option<String>,
+        /// Number of days considered when ranking items by trend.
         pub ranked_by_trend_days: Option<u32>,
+        /// Fill `children` with the ids of each item's required items.
         pub return_children: Option<bool>,
     }
 
@@ -582,6 +618,17 @@ pub mod workshop {
         query_handle
     }
 
+    /// Gets one Workshop item by its published file id. The query runs through the Steam client, so a
+    /// running Steam client is needed. Whether a logged-in account is also required is unverified
+    /// against a live Steam client.
+    ///
+    /// Resolves with the item, or with `null` when the query returns no record for the id. The optional
+    /// `children` field is filled only with `returnChildren`, and `additionalPreviews` only with
+    /// `includeAdditionalPreviews`. Rejects when the query cannot be created or Steam returns an error.
+    ///
+    /// @param item - the Workshop item to read (its published file id)
+    /// @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+    /// @returns the item, or `null` when the query returned no record for the id
     #[napi]
     pub async fn get_item(
         item: BigInt,
@@ -626,6 +673,18 @@ pub mod workshop {
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
+    /// Gets several Workshop items in one query. The query runs through the Steam client, so a running
+    /// Steam client is needed. Whether a logged-in account is also required is unverified against a
+    /// live Steam client.
+    ///
+    /// Resolves with `items` and `wasCached`. `items` has one entry per record Steam returned, and an
+    /// entry is `null` where Steam returned no record. The entries are not matched back to the input
+    /// ids, so use each item's `publishedFileId` to match them. Rejects when the query cannot be created
+    /// or Steam returns an error.
+    ///
+    /// @param items - the published file ids to read
+    /// @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+    /// @returns `items`, and `wasCached` for whether the answer came from Steam's cache
     #[napi]
     pub async fn get_items(
         items: Vec<BigInt>,
@@ -674,6 +733,24 @@ pub mod workshop {
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
+    /// Queries one page of all Workshop items that match the given type, ranking and app ids. The query
+    /// runs through the Steam client, so a running Steam client is needed. Whether a logged-in account
+    /// is also required is unverified against a live Steam client.
+    ///
+    /// Resolves with `items` for this page, `returnedResults` (the number of entries on this page),
+    /// `totalResults` (the matches across all pages) and `wasCached`. Entries are `null` where Steam
+    /// returned no record. To read everything, keep requesting pages while the collected count is below
+    /// `totalResults` and the last page returned items. The page size is set by Steam; the README and
+    /// the skill give 50 per page, unverified against a live Steam client. Rejects when the query cannot
+    /// be created or Steam returns an error.
+    ///
+    /// @param page - the page to read, passed to Steam as given; the first page index is unverified against a live Steam client
+    /// @param queryType - the ranking and filter of the query, a `UGCQueryType` value such as `RankedByPublicationDate`
+    /// @param itemType - the kind of item to list, a `UGCType` value such as `Items`
+    /// @param creatorAppId - the app id that created the items
+    /// @param consumerAppId - the app id that uses the items; Steam filters by both app ids
+    /// @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+    /// @returns the page of items with `returnedResults`, `totalResults` and `wasCached`
     #[napi]
     pub async fn get_all_items(
         page: u32,
@@ -730,6 +807,22 @@ pub mod workshop {
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
+    /// Queries one page of the Workshop items related to one user, such as their published, subscribed or
+    /// favorited items. The query runs through the Steam client, so a running Steam client is needed.
+    /// Whether a logged-in account is also required is unverified against a live Steam client.
+    ///
+    /// Resolves with the same fields as `getAllItems`: `items` for this page, `returnedResults`,
+    /// `totalResults` and `wasCached`. Entries are `null` where Steam returned no record. Paging works as
+    /// described for `getAllItems`. Rejects when the query cannot be created or Steam returns an error.
+    ///
+    /// @param page - the page to read, passed to Steam as given; the first page index is unverified against a live Steam client
+    /// @param accountId - the 32-bit account id of the user (the lower 32 bits of their SteamID64)
+    /// @param listType - which list to read, a `UserListType` value such as `Published` or `Subscribed`
+    /// @param itemType - the kind of item to list, a `UGCType` value such as `Items`
+    /// @param sortOrder - the order of the list, a `UserListOrder` value such as `LastUpdatedDesc`
+    /// @param appIds - the `creator` and `consumer` app ids; a missing one is sent as `0`, and what Steam does with `0` is unverified
+    /// @param queryConfig - optional query options; see `WorkshopItemQueryConfig`. Omitted, no options are set.
+    /// @returns the page of items with `returnedResults`, `totalResults` and `wasCached`
     #[napi]
     pub async fn get_user_items(
         page: u32,
