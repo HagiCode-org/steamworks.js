@@ -52,6 +52,13 @@ for (const [namespace, name] of [
     ['stats', 'requestUserStats'],
     ['achievement', 'requestGlobalPercentages'],
     ['achievement', 'getAchievedPercent'],
+    ['achievement', 'getInfo'],
+    ['achievement', 'getAll'],
+    ['achievement', 'getUnlockTime'],
+    ['achievement', 'getProgressLimits'],
+    ['achievement', 'indicateProgress'],
+    ['achievement', 'getIcon'],
+    ['achievement', 'loadIcon'],
     ['leaderboard', 'find'],
     ['leaderboard', 'findOrCreate'],
 ]) {

@@ -1,5 +1,5 @@
 import * as steamworks from "steamworks.js";
-import type { cloud, friends, leaderboard, matchmakingServers, networkingMessages, networkingSockets, networkingUtils, remotePlay, timeline, workshop } from "steamworks.js";
+import type { achievement, cloud, friends, leaderboard, matchmakingServers, networkingMessages, networkingSockets, networkingUtils, remotePlay, timeline, workshop } from "steamworks.js";
 
 export default function main() {
 	const client = steamworks.init(480);
@@ -89,6 +89,25 @@ export async function recordDistance(meters: number): Promise<number | null> {
 	await client.achievement.requestGlobalPercentages();
 	const percent: number | null = client.achievement.getAchievedPercent("FIRST_RUN");
 	return stored && count !== null && percent !== null ? client.stats.getFloat("distance") : null;
+}
+
+// Example of the achievement display API: name, description, unlock time, percentage, progress limits and icon
+export async function listAchievements(): Promise<string[]> {
+	const client = steamworks.init(480);
+	await client.achievement.requestGlobalPercentages();
+	const lines: string[] = [];
+	for (const item of client.achievement.getAll()) {
+		const name: string = item.displayName ?? item.name;
+		const when: Date | null = item.unlockTime === undefined ? null : new Date(item.unlockTime * 1000);
+		const percent: number | undefined = item.globalPercent;
+		const limits: achievement.AchievementProgressLimits | undefined = item.progressLimits;
+		lines.push(`${name} ${item.unlocked} ${when?.toISOString()} ${percent} ${limits?.max}`);
+	}
+	const icon: achievement.AchievementIcon | null = await client.achievement.loadIcon("FIRST_RUN", 3000);
+	if (icon) {
+		lines.push(`${icon.width}x${icon.height} ${icon.rgba.length}`);
+	}
+	return lines;
 }
 
 // Example of the leaderboard namespace: finds or creates a board, uploads a score and reads the top ten

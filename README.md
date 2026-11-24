@@ -437,7 +437,7 @@ client.friends.clearRichPresence()
 
 ## Stats, Achievements and Leaderboards
 
-`stats` gains float stats, the achievement count and a request for another user's stats. `achievement` gains global unlock percentages. The `leaderboard` namespace finds and creates leaderboards, uploads scores and downloads entries.
+`stats` gains float stats, the achievement count and a request for another user's stats. `achievement` gains global unlock percentages and the data an achievement page needs: display name, description, hidden flag, unlock time, progress limits and icon. The `leaderboard` namespace finds and creates leaderboards, uploads scores and downloads entries.
 
 ```js
 const steamworks = require('steamworks.js')
@@ -463,6 +463,32 @@ if (board) {
 - `requestUserStats(steamId64)` only starts the request. Its result arrives through the `UserStatsReceived` callback (see `callback.register`).
 - The Promise-returning functions (`requestGlobalPercentages`, `find`, `findOrCreate`, `uploadScore`, `downloadEntries`) resolve when Steam answers. Steam delivers those answers inside `runCallbacks()`. `init()` runs it about 30 times a second, so you do not need to call it yourself while the client is initialized.
 - A Promise rejects with a readable message when Steam reports a failure. When the answer is lost, the message says the outcome is unknown, so check the data before retrying an upload.
+
+### Achievement display data
+
+`achievement.getAll()` and `achievement.getInfo(name)` return what a client needs to list achievements. Call `requestGlobalPercentages()` first to fill `globalPercent`.
+
+```js
+await client.achievement.requestGlobalPercentages()
+
+for (const item of client.achievement.getAll()) {
+  // item: { name, displayName?, description?, hidden?, unlocked, unlockTime?, globalPercent?, progressLimits? }
+  const when = item.unlockTime === undefined ? null : new Date(item.unlockTime * 1000)
+  console.log(item.displayName ?? item.name, item.unlocked, when, item.globalPercent)
+}
+
+// Icon as raw RGBA pixels; loadIcon waits for Steam to fetch it, getIcon does not
+const icon = await client.achievement.loadIcon('FIRST_RUN', 3000) // { width, height, rgba: Buffer } or null
+```
+
+- `unlockTime` is in seconds since 1970-01-01 UTC. It is left out for a locked achievement and for unlocks that Steam has no time for (Steam reports `0` for unlocks before December 2009).
+- `displayName`, `description` and `hidden` come from Steam's localized achievement data. They are left out when Steam has no data, for example before the user's stats have arrived.
+- `getInfo` returns `null` when Steam cannot read the achievement (unknown name, stats not received). That is a failed lookup, not a locked achievement. `getAll` skips such entries, so compare its length with `stats.getNumAchievements()`.
+- `names()` returns an empty array when the app defines no achievements instead of throwing.
+- `progressLimits` (also `getProgressLimits(name)`) gives the min and max of the stat that Steam links to the achievement, or is left out when there is none. Steam's achievement API does not return the current value: read the linked stat with `stats.getInt` or `stats.getFloat`.
+- `indicateProgress(name, current, max)` shows the Steam overlay progress notice. It never unlocks the achievement.
+- `getIcon` and `loadIcon` return `null` while Steam has not fetched the icon and when the achievement has no icon. Steam picks the locked or unlocked artwork from the user's state. Convert the RGBA pixels to PNG on your side if you need a file.
+- Not verified against a live Steam client in this checkout: only the export list and the TypeScript declarations are tested offline.
 
 ## Networking: `networking` and the New Namespaces
 

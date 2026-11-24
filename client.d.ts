@@ -54,7 +54,7 @@ export declare namespace achievement {
   export function clear(achievement: string): boolean
   /**
    * Returns the API names of all achievements defined for the app. Needs `init()`.
-   * Fails when Steam returns no list; the binding then panics. Unverified against a live Steam client: how that failure reaches JavaScript.
+   * Returns an empty array when the app defines no achievements or Steam has no list yet, so an empty result can mean either; use `getNumAchievements()` on `stats` to tell "not loaded" from a count.
    * @returns the achievement API names defined for the app.
    */
   export function names(): Array<string>
@@ -68,6 +68,89 @@ export declare namespace achievement {
    * Call `requestGlobalPercentages()` first.
    */
   export function getAchievedPercent(achievement: string): number | null
+  /** The bounds of the progress stat that Steam links to an achievement. */
+  export interface AchievementProgressLimits {
+    /** Lowest value of the linked stat. */
+    min: number
+    /** Value of the linked stat at which the achievement is complete. */
+    max: number
+    /** `true` when the linked stat is a float stat, `false` when it is an integer stat. */
+    isFloat: boolean
+  }
+  /** Everything Steam knows about one achievement for the local user, ready for display. */
+  export interface AchievementInfo {
+    /** The achievement API name as configured in Steamworks. */
+    name: string
+    /** Localized display name, or left out (`undefined`) when Steam has none (stats not received, or the achievement is not published). */
+    displayName?: string
+    /** Localized description, or left out when Steam has none. Steam may return a placeholder text for hidden achievements that are still locked. */
+    description?: string
+    /** `true` for a hidden achievement, left out when Steam does not say. */
+    hidden?: boolean
+    /** Whether the local user has unlocked the achievement. */
+    unlocked: boolean
+    /** When the achievement was unlocked, in seconds since 1970-01-01 UTC (multiply by 1000 for `new Date()`). left out when the achievement is locked or Steam has no time for it. Steam reports `0` for unlocks before December 2009, which is also left out. */
+    unlockTime?: number
+    /** Global percentage of players who unlocked it (0 to 100). left out until `requestGlobalPercentages()` has resolved, or when Steam has no data (always for AppId 480). */
+    globalPercent?: number
+    /** Bounds of the progress stat linked to the achievement, or left out when the achievement has none. */
+    progressLimits?: AchievementProgressLimits
+  }
+  /** An achievement icon as raw pixels. */
+  export interface AchievementIcon {
+    /** Width in pixels. */
+    width: number
+    /** Height in pixels. */
+    height: number
+    /** `width * height * 4` bytes of RGBA, row by row. */
+    rgba: Buffer
+  }
+  /**
+   * Reads everything needed to display one achievement: name, description, hidden flag, unlocked state, unlock time, global percentage and progress limits. Needs `init()`, which requests the user's stats.
+   * Call `requestGlobalPercentages()` first to get `globalPercent`; the icon is read separately with `getIcon()`.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns the achievement, or `null` when Steam cannot read it (unknown name, or stats not received yet). That failure is not the same as a locked achievement.
+   */
+  export function getInfo(achievement: string): AchievementInfo | null
+  /**
+   * Reads every achievement the app defines, in the order Steam lists them. Same data as `getInfo()` per entry.
+   * An achievement Steam cannot read is skipped, so compare the length with `stats.getNumAchievements()` to detect missing entries. Returns an empty array when the app defines no achievements or the stats are not loaded.
+   * Call `requestGlobalPercentages()` first to fill `globalPercent`.
+   */
+  export function getAll(): Array<AchievementInfo>
+  /**
+   * Returns when the user unlocked an achievement.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns seconds since 1970-01-01 UTC, or `null` when the achievement is locked, Steam has no time for it, or the lookup fails.
+   */
+  export function getUnlockTime(achievement: string): number | null
+  /**
+   * Returns the bounds of the progress stat that Steam links to an achievement. The current value of that stat is not part of the achievement API; read it with `stats.getInt()` or `stats.getFloat()` using the stat name from the Steamworks configuration.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns the limits, or `null` when the achievement has no linked progress stat or the lookup fails.
+   */
+  export function getProgressLimits(achievement: string): AchievementProgressLimits | null
+  /**
+   * Shows the Steam overlay progress notification for an achievement. It does not unlock the achievement, even when `current` equals `max`; call `activate()` for that.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @param current - the progress reached
+   * @param max - the progress that completes the achievement
+   * @returns `true` when Steam accepted the request, otherwise `false`.
+   */
+  export function indicateProgress(achievement: string, current: number, max: number): boolean
+  /**
+   * Reads the icon of an achievement as raw RGBA pixels, unlocked or locked according to the user's state (Steam chooses).
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @returns the icon, or `null` while Steam has not fetched it yet or when the achievement has no icon. Use `loadIcon()` to wait for it.
+   */
+  export function getIcon(achievement: string): AchievementIcon | null
+  /**
+   * Like `getIcon()`, but waits for Steam to fetch the icon. Steam answers inside `runCallbacks()`, which `init()` already runs on a timer.
+   * @param achievement - The achievement API name as configured in Steamworks.
+   * @param timeoutMs - how long to wait, in milliseconds; defaults to 5000
+   * @returns the icon, or `null` when it is still missing after the timeout (no icon is set, or Steam is slow). The two cases cannot be told apart.
+   */
+  export function loadIcon(achievement: string, timeoutMs?: number | undefined | null): Promise<AchievementIcon | null>
 }
 export declare namespace apps {
   /**
