@@ -311,4 +311,36 @@ pub mod achievement {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
     }
+
+    /// One entry of the global "most achieved" ranking, as returned by `getMostAchievedAchievements()`.
+    #[napi(object)]
+    pub struct AchievementRank {
+        /// The achievement API name as configured in Steamworks.
+        pub name: String,
+        /// The global unlock percentage, from 0 to 100.
+        pub percent: f64,
+        /// Whether the local user has unlocked the achievement.
+        pub achieved: bool,
+    }
+
+    /// Returns the app's achievements ranked by global unlock percentage, in the order Steam lists them (most achieved first).
+    /// Call `requestGlobalPercentages()` first. Returns an empty array while the percentages are not loaded or when the app has no achievements.
+    /// @returns the ranking, one entry per achievement
+    #[napi]
+    pub fn get_most_achieved_achievements() -> Vec<AchievementRank> {
+        let client = crate::client::get_client();
+        let user_stats = client.user_stats();
+        let mut ranking = Vec::new();
+        let mut current = user_stats.get_most_achieved_achievement_info();
+        while let Some(entry) = current {
+            let iterator = entry.iterator;
+            ranking.push(AchievementRank {
+                name: entry.name,
+                percent: f64::from(entry.percent),
+                achieved: entry.achieved,
+            });
+            current = user_stats.get_next_most_achieved_achievement_info(iterator);
+        }
+        ranking
+    }
 }

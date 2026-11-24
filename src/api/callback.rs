@@ -48,6 +48,15 @@ pub mod callback {
         NewUrlLaunchParameters,
         AuthSessionTicketResponse,
         ValidateAuthTicketResponse,
+        AppProofOfPurchaseKeyResponse,
+        GameConnectedFriendChatMsg,
+        GameConnectedClanChatMsg,
+        GameConnectedChatJoin,
+        GameConnectedChatLeave,
+        FriendRichPresenceUpdate,
+        UnreadChatMessagesChanged,
+        OverlayBrowserProtocolNavigation,
+        EquippedProfileItemsChanged,
     }
 
     /// Registers a handler for a Steam callback. Needs `init()`.
@@ -120,6 +129,9 @@ pub mod callback {
             SteamCallback::LobbyChatMsg => {
                 register_callback::<steamworks::LobbyChatMsg>(threadsafe_handler)
             }
+            SteamCallback::AppProofOfPurchaseKeyResponse => {
+                register_callback::<steamworks::AppProofOfPurchaseKeyResponse>(threadsafe_handler)
+            }
             SteamCallback::ScreenshotRequested => register_callback::<
                 steamworks::screenshots::ScreenshotRequested,
             >(threadsafe_handler),
@@ -134,6 +146,30 @@ pub mod callback {
             }
             SteamCallback::ValidateAuthTicketResponse => {
                 register_callback::<steamworks::ValidateAuthTicketResponse>(threadsafe_handler)
+            }
+            SteamCallback::GameConnectedFriendChatMsg => {
+                register_callback::<steamworks::GameConnectedFriendChatMsg>(threadsafe_handler)
+            }
+            SteamCallback::GameConnectedClanChatMsg => {
+                register_callback::<steamworks::GameConnectedClanChatMsg>(threadsafe_handler)
+            }
+            SteamCallback::GameConnectedChatJoin => {
+                register_callback::<steamworks::GameConnectedChatJoin>(threadsafe_handler)
+            }
+            SteamCallback::GameConnectedChatLeave => {
+                register_callback::<steamworks::GameConnectedChatLeave>(threadsafe_handler)
+            }
+            SteamCallback::FriendRichPresenceUpdate => {
+                register_callback::<steamworks::FriendRichPresenceUpdate>(threadsafe_handler)
+            }
+            SteamCallback::UnreadChatMessagesChanged => {
+                register_callback::<steamworks::UnreadChatMessagesChanged>(threadsafe_handler)
+            }
+            SteamCallback::OverlayBrowserProtocolNavigation => register_callback::<
+                steamworks::OverlayBrowserProtocolNavigation,
+            >(threadsafe_handler),
+            SteamCallback::EquippedProfileItemsChanged => {
+                register_callback::<steamworks::EquippedProfileItemsChanged>(threadsafe_handler)
             }
         };
 

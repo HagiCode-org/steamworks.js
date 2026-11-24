@@ -9,6 +9,6 @@
     },
     "main": "index.ts",
     "scripts": {
-        "compile": "tsc --noEmit --strict index.ts"
+        "compile": "tsc --noEmit --strict --target es2020 --module commonjs index.ts stats-utils-apps.ts friends.ts user-remotestorage.ts inventory.ts http-netutils-timeline.ts"
     }
 }

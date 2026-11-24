@@ -167,4 +167,41 @@ export interface CallbackReturns {
         response: { Ok: null } | { Err: AuthSessionValidateErrorName }
         owner_steam_id: bigint
     }
+    [client.callback.SteamCallback.AppProofOfPurchaseKeyResponse]: {
+        /** `0` marks the final callback of `requestAllProofOfPurchaseKeys`. */
+        app_id: number
+        result: SteamResult
+        /** Legacy CD key. Treat it as a secret and do not log it. */
+        key: string
+    }
+    [client.callback.SteamCallback.GameConnectedFriendChatMsg]: {
+        steam_id: bigint
+        message_id: number
+    }
+    [client.callback.SteamCallback.GameConnectedClanChatMsg]: {
+        clan_chat: bigint
+        user: bigint
+        message_id: number
+    }
+    [client.callback.SteamCallback.GameConnectedChatJoin]: {
+        clan_chat: bigint
+        user: bigint
+    }
+    [client.callback.SteamCallback.GameConnectedChatLeave]: {
+        clan_chat: bigint
+        user: bigint
+        kicked: boolean
+        dropped: boolean
+    }
+    [client.callback.SteamCallback.FriendRichPresenceUpdate]: {
+        steam_id: bigint
+        app_id: number
+    }
+    [client.callback.SteamCallback.UnreadChatMessagesChanged]: {}
+    [client.callback.SteamCallback.OverlayBrowserProtocolNavigation]: {
+        uri: string
+    }
+    [client.callback.SteamCallback.EquippedProfileItemsChanged]: {
+        steam_id: bigint
+    }
 }

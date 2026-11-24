@@ -67,6 +67,20 @@ pub mod leaderboard {
         Ok(())
     }
 
+    /// The most users the SDK accepts in one `DownloadLeaderboardEntriesForUsers` call.
+    const MAX_USERS_PER_DOWNLOAD: usize = 100;
+
+    /// Reads a non-negative 64-bit value from a BigInt. Returns `None` for a negative value or one that does not fit in 64 bits.
+    fn u64_from_bigint(value: &BigInt) -> Option<u64> {
+        let (signed, raw, lossless) = value.get_u64();
+        (!signed && lossless).then_some(raw)
+    }
+
+    /// Reads a SteamID from a BigInt. Returns `None` for a negative value or one that does not fit in 64 bits.
+    fn steam_id_from_bigint(value: &BigInt) -> Option<steamworks::SteamId> {
+        u64_from_bigint(value).map(steamworks::SteamId::from_raw)
+    }
+
     impl From<LeaderboardSortMethod> for steamworks::LeaderboardSortMethod {
         fn from(value: LeaderboardSortMethod) -> Self {
             match value {
@@ -279,6 +293,62 @@ pub mod leaderboard {
                 },
             );
             let entries = await_completion(rx, "downloading the leaderboard entries").await?;
+            Ok(entries.into_iter().map(LeaderboardEntry::from).collect())
+        }
+
+        /// Attaches a piece of cloud content to the local user's entry on this leaderboard. This changes the user's leaderboard data on Steam.
+        /// @param ugcHandle - the UGC handle of the content, as a BigInt (for example the value returned by `cloud.shareFile()`)
+        /// @returns resolves when Steam accepts the attachment; rejects with Steam's error otherwise, or when the handle is not a valid 64-bit value
+        #[napi]
+        pub async fn attach_ugc(&self, ugc_handle: BigInt) -> Result<(), Error> {
+            let handle = u64_from_bigint(&ugc_handle).ok_or_else(|| {
+                Error::from_reason("ugcHandle must be a non-negative 64-bit value")
+            })?;
+            let client = crate::client::get_client();
+            let (tx, rx) = oneshot::channel();
+            client
+                .user_stats()
+                .attach_leaderboard_ugc(&self.inner, handle, |result| {
+                    let _ = tx.send(result);
+                });
+            await_completion(rx, "attaching the content to the leaderboard").await?;
+            Ok(())
+        }
+
+        /// Downloads the leaderboard entries of the given users only. A user with no entry on this leaderboard is left out of the result.
+        /// Steam accepts at most 100 users per request and only one such request at a time; this binding rejects more than 100 before it calls Steam.
+        /// @param steamIds64 - the users' 64-bit SteamIDs, at most 100
+        /// @param maxDetails - maximum number of detail integers returned per entry
+        /// @returns the entries Steam returns, in Steam's order
+        #[napi]
+        pub async fn download_entries_for_users(
+            &self,
+            steam_ids64: Vec<BigInt>,
+            max_details: u32,
+        ) -> Result<Vec<LeaderboardEntry>, Error> {
+            if steam_ids64.len() > MAX_USERS_PER_DOWNLOAD {
+                return Err(Error::from_reason(
+                    "at most 100 users can be downloaded at a time",
+                ));
+            }
+            let mut users = Vec::with_capacity(steam_ids64.len());
+            for id in &steam_ids64 {
+                users.push(steam_id_from_bigint(id).ok_or_else(|| {
+                    Error::from_reason("steamIds64 must contain valid 64-bit SteamIDs")
+                })?);
+            }
+            let client = crate::client::get_client();
+            let (tx, rx) = oneshot::channel();
+            client.user_stats().download_leaderboard_entries_for_users(
+                &self.inner,
+                &users,
+                max_details as usize,
+                |result| {
+                    let _ = tx.send(result);
+                },
+            );
+            let entries =
+                await_completion(rx, "downloading the leaderboard entries of the users").await?;
             Ok(entries.into_iter().map(LeaderboardEntry::from).collect())
         }
     }

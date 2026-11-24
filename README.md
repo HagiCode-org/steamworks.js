@@ -490,6 +490,191 @@ const icon = await client.achievement.loadIcon('FIRST_RUN', 3000) // { width, he
 - `getIcon` and `loadIcon` return `null` while Steam has not fetched the icon and when the achievement has no icon. Steam picks the locked or unlocked artwork from the user's state. Convert the RGBA pixels to PNG on your side if you need a file.
 - Not verified against a live Steam client in this checkout: only the export list and the TypeScript declarations are tested offline.
 
+### Global stats, achievement ranking, utils and apps
+
+`stats` gains other users' stats, global stats with daily history, average-rate stats and the current player count. `achievement.getMostAchievedAchievements()` returns the global ranking. `leaderboard` gains `attachUgc` and `downloadEntriesForUsers`. `utils` gains the Steam universe, IPv6 state, file signature check and text filter. `apps` gains DLC listing and install control, file details, timed trial, beta branches and proof-of-purchase keys.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// Global stats: request first, then read. int64 values are BigInts; history is newest day first
+await client.stats.requestGlobalStats(7)
+console.log(client.stats.getGlobalInt('total_kills'), client.stats.getGlobalIntHistory('total_kills', 7))
+
+// Achievement ranking, most achieved first; needs requestGlobalPercentages() first
+await client.achievement.requestGlobalPercentages()
+console.log(client.achievement.getMostAchievedAchievements()) // [{ name, percent, achieved }]
+
+// DLC and beta branches. installDlc and setActiveBeta change the local installation
+const dlcs = client.apps.getDlcs()     // [{ appId, available, name }]
+const betas = client.apps.getBetas()   // [{ name, description, buildId, flags, isDefault, isSelected, ... }]
+
+// Text filter: initFilterText() first; 2 = Chat
+client.utils.initFilterText()
+const filtered = client.utils.filterText(2, 76561198000000000n, 'some chat text') // { text, filteredCount } or null
+```
+
+- `getUserInt` and `getUserFloat` need `requestUserStats(steamId64)` to have completed for that user. They return `null` when the stat is missing or the user's stats are not loaded.
+- Promises from `requestGlobalStats`, `getNumberOfCurrentPlayers`, `attachUgc`, `downloadEntriesForUsers`, `checkFileSignature` and `getFileDetails` resolve when Steam answers. That happens inside `runCallbacks()`, which `init()` runs about 30 times a second. A Promise rejects with a readable message when Steam reports an error.
+- `requestGlobalStats(days)` accepts at most 60 days, and the global history getters return `null` above that. The global getters return `null` until the request completes.
+- `updateAvgRateStat` changes the local stats. Nothing reaches Steam until `stats.store()`. Steam keeps the count as a 32-bit float.
+- `downloadEntriesForUsers` takes at most 100 SteamIDs; more are rejected before Steam is called. `attachUgc` changes the user's leaderboard data on Steam.
+- `installDlc`, `uninstallDlc`, `markContentCorrupt` and `setActiveBeta` change the local installation. `setDlcContext` only tells Steam which DLC is being played.
+- `requestProofOfPurchaseKey` and `requestAllProofOfPurchaseKeys` answer through the `AppProofOfPurchaseKeyResponse` callback (`callback.register`). The final callback of the full request has `appId` `0`. The keys are secrets: do not log them.
+- Units: `getEarliestPurchaseUnixTime` is seconds since 1970-01-01 UTC. `getDlcDownloadProgress` and `getFileDetails` report bytes as BigInts. `getFileDetails().sha1` is 40 lowercase hex characters. `getSecondsSinceAppActive` and `getSecondsSinceComputerActive` are seconds. `getCurrentBatteryPower` is a percentage, and 255 means AC power.
+- Sync calls return `null` or `false` on failure and do not throw. The SDK header does not say what `getEarliestPurchaseUnixTime` returns without a purchase, and does not define the `available` flag of a DLC or the flags of `getFileDetails`.
+- Not verified against a live Steam client: all of the above. Only the export list and the TypeScript types are tested offline.
+
+### Inventory
+
+`client.inventory` reads and changes the user's Steam Inventory: item instances, item definitions, promotions, prices and purchases. Most calls resolve once Steam has answered.
+
+```js
+const { items, timestamp, expired } = await client.inventory.getAllItems()
+for (const item of items) {
+  // item: { itemId: bigint, definition: number, quantity: number, flags: number }
+  console.log(item.itemId, item.definition, item.quantity)
+}
+
+// Changes the real inventory: ask the user before you call this
+const { items: changed } = await client.inventory.consumeItem(items[0].itemId, 1)
+
+// Items another player sent: null when Steam rejects the buffer or it belongs to someone else
+const verified = client.inventory.deserializeResult(received, senderSteamId)
+
+// Property changes are one batch: set what you need, then submit once
+const update = client.inventory.startUpdateProperties()
+update?.setInt64(items[0].itemId, 'level', 3n)
+await update?.submit()
+```
+
+- Each Promise resolves when Steam's `SteamInventoryResultReady_t` callback arrives. Steam delivers that callback inside `runCallbacks()`, which `init()` runs on a timer. Every async function takes an optional `timeoutMs` (default 30000).
+- A Promise rejects with a readable message when Steam reports an error. When no answer arrives within `timeoutMs`, the message says the outcome is unknown: the change may still have happened, so check the inventory before you retry.
+- Functions that grant, create, consume, exchange, trade, buy or submit property changes change the user's real inventory. Ask the user to confirm before you call them.
+- Item instance ids, Steam ids and prices are `bigint`, because they can exceed 2^53. `definition`, `quantity` and `flags` are `number`. Prices are in the smallest unit of the currency that `requestPrices()` reports.
+- `expired: true` means Steam may have changed the result since it was made, for example because an item was traded or consumed. The items are still returned.
+- `serializeItems(itemIds)` returns a Buffer. Steam marks a serialized result `expired` after one hour. `deserializeResult(data, steamId)` is synchronous and returns `null` on failure, so pass the Steam id of the player who sent the buffer.
+- `loadItemDefinitions()` only starts the load. This binding does not expose Steam's definition-update callback, so it cannot tell you when the definitions are complete. `getItemDefinitions()` can return an incomplete list until then.
+- `startPurchase()` resolves when Steam opens the transaction. The user completes the purchase in the Steam overlay, and the final result arrives later through Steam's result-ready callback, not through this Promise.
+- `tradeItems()` and `sendItemDropHeartbeat()` are deprecated by Steam. The SDK documents trading as not supported, so `tradeItems()` is expected to reject.
+- Not verified against a live Steam client: no call was made against a Steam account in this checkout. Only the export list, the TypeScript declarations and the pure conversion code are tested offline.
+
+### User, user-file and UGC calls (`localplayer`, `auth`, `cloud`)
+
+- `localplayer` adds the ISteamUser calls that were missing: `getHSteamUser()`, `trackAppUsageEvent()`, `getUserDataFolder()`, the voice calls (`startVoiceRecording()`, `stopVoiceRecording()`, `getAvailableVoice()`, `getVoice()`, `decompressVoice()`, `getVoiceOptimalSampleRate()`), `isBehindNat()`, `advertiseGame()`, `getGameBadgeLevel()`, the phone and two-factor checks, `getMarketEligibility()`, `getDurationControl()` and `setDurationControlOnlineState()`.
+- `auth` adds `requestEncryptedAppTicket()`, `getEncryptedAppTicket()` and `requestStoreAuthUrl()`. The encrypted ticket is requested first, then read; `getEncryptedAppTicket()` does not call Steam.
+- `cloud` adds the user-file calls `getQuota()`, `writeFileAsync()`, `openWriteStream()` (a `FileWriteStream` with `writeChunk()`, `close()` and `cancel()`), `beginFileWriteBatch()`, `endFileWriteBatch()` and `getLocalFileChanges()`.
+- `cloud` also adds the UGC calls `downloadUgc()`, `downloadUgcToLocation()`, `getUgcDownloadProgress()`, `getUgcDetails()`, `readUgc()`, `getCachedUgcCount()` and `getCachedUgcHandle()`.
+- Steam ids and UGC handles are `bigint`. A negative id or one of 2^64 or more is rejected before anything is sent. Results that Steam can leave empty come back as `null`.
+- Async functions resolve through `runCallbacks()`, which `init()` already calls. There is no timeout: if Steam never answers, the Promise stays pending. For `writeFileAsync()` and the `downloadUgc*()` calls, the outcome is then unknown.
+- `writeFileAsync()` and `FileWriteStream.close()` change the user's cloud files, and `downloadUgc*()` starts network transfers. Ask the user to confirm before you call them.
+- A `FileWriteStream` that is garbage-collected without `close()` or `cancel()` is closed by the wrapper, which commits the chunks written so far. When that happens depends on the garbage collector, so call `close()` or `cancel()` yourself.
+- The legacy Workshop publishing calls of `ISteamRemoteStorage` are not exposed; `ISteamUGC` replaces them (see the `workshop` namespace).
+- Not verified against a live Steam client: no call was made against a Steam account in this checkout. Only the export list, the TypeScript declarations and the argument checks that run before any Steam call are tested offline.
+
+### ISteamFriends: groups, clans, clan chat, follows and profile items
+
+The `friends` namespace also covers the rest of ISteamFriends: friends groups, clans and clan officers, clan and friend chat, follower counts, equipped profile items, rich presence reads and clan activity counts. This example shows one call of each kind.
+
+```js
+const steamworks = require('steamworks.js')
+const client = steamworks.init(appId)
+
+// A cache read: no Steam request. Each group lists its members as SteamID64 bigints.
+for (const group of client.friends.getFriendGroups()) {
+  console.log(group.name, group.members.length)
+}
+
+async function readClanChat(clanChatId) {
+  // 1 = ChatRoomEnterResponse.Success; other values are Steam's failure reasons
+  if ((await client.friends.joinClanChatRoom(clanChatId)) !== 1) return null
+  return client.friends.getClanChatMessage(clanChatId, 0) // ChatMessage or null
+}
+
+async function readFollowing() {
+  // One page of the following list, up to 50 SteamIDs per page
+  const page = await client.friends.enumerateFollowingList(0)
+  console.log(page.steamIds.length, page.totalCount)
+}
+```
+
+- Units: SteamIDs and clan chat ids are `bigint`. Indexes, counts and `totalCount` are `number`. `enumerateFollowingList(startIndex)` returns at most 50 SteamIDs per page, the SDK's `k_cEnumerateFollowersMax` limit.
+- Cache reads (`getFriendGroups()`, `getClans()`, `getFriendRichPresence()`, `getProfileItemPropertyString()`) answer from data that Steam already holds. Without that data they return `null`, `0` or an empty list. Request it first: `requestFriendRichPresence()` (the `FriendRichPresenceUpdate` callback follows), and the Promises of `requestEquippedProfileItems()`, `downloadClanActivityCounts()`, `requestClanOfficerList()` and `getClanInfo()`.
+- The Promise calls (`joinClanChatRoom()`, `getFollowerCount()`, `isFollowing()`, `enumerateFollowingList()`, `requestEquippedProfileItems()`, `getClanInfo()`, `downloadClanActivityCounts()`, `requestClanOfficerList()`) resolve through `runCallbacks()`, which `init()` already calls. They reject with Steam's error text when Steam reports a failure. There is no timeout: a call that Steam never answers stays pending.
+- `joinClanChatRoom()` resolves with a `ChatRoomEnterResponse`. Only `1` (`Success`) means the room was joined. Values `2` to `12` are the SDK's failure reasons.
+- Chat messages arrive as callbacks. Register `GameConnectedFriendChatMsg`, `GameConnectedClanChatMsg`, `GameConnectedChatJoin` and `GameConnectedChatLeave` with `callback.register()`, and call `setListenForFriendsMessages(true)` before you expect friend messages. The callbacks fire only from `runCallbacks()`.
+- `getClanChatMessage(clanChatId, index)` and `getFriendMessage(steamId, index)` return a `ChatMessage` or `null`. `sendClanChatMessage()` and `replyToFriendMessage()` return a boolean, which is `true` only when Steam accepts the message. Not verified: the order of the message index and what Steam returns for an index past the end.
+- Not verified against a live Steam client: no call was made against a Steam account in this checkout. Also unverified: a clan's name before its download, a friend's Steam level before Steam loads it, the value of an empty rich presence key, and what `registerProtocolInOverlayBrowser()` does in the overlay. The export list, the TypeScript declarations, the enum values and the callback numbers are tested offline.
+
+### Steam HTTP (`http`)
+
+Sends HTTP requests through the Steam client. It needs `init()` and a running, logged-in Steam client.
+
+```js
+const client = steamworks.init(480)
+const response = await client.http.request({
+    method: 'GET',
+    url: 'https://example.com/api/items',
+    query: { page: '1' },
+    headers: { Accept: 'application/json' },
+    responseHeaders: ['ETag'],
+    timeoutMs: 10000,
+})
+console.log(response.status, response.headers.ETag, response.body.toString('utf8'))
+```
+
+- `request()` resolves for every answer the server gives, including `404` and `500`, so check `status` yourself. It rejects when the request cannot be created or sent, when Steam refuses a header or option, when Steam cannot complete the request, when no answer comes, or when the request times out.
+- Units: `timeoutMs` is a total time limit in milliseconds. Unlike the inactivity timeout, it does not reset when data arrives. Steam's default is no total limit.
+- Methods: `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `OPTIONS` and `PATCH`, in any letter case. `query` is added to the URL for `GET` and sent as form data for other methods. `form` is sent as form data. `body` (a `Buffer`) needs a method that accepts a body, cannot be combined with `form` or `query`, and uses `contentType` (default `application/octet-stream`).
+- `responseHeaders` names the response headers to return. Steam cannot list all of them, so name each one you need. The response has no status text, because the SDK does not provide one.
+- Cookies: `client.http.createCookieContainer(allowResponsesToModify)` makes a container that lasts for this process only. Pass it as `cookieContainer` and add cookies with `setCookie(host, url, cookie)`.
+- The promise resolves through `runCallbacks()`, which `init()` already calls.
+- Not verified against a live Steam client: how HTTPS certificates are checked against a browser's rules, and what `requireVerifiedCertificate: false` does.
+
+### Networking utilities (`networkingUtils`)
+
+Ping locations, data centers (POPs), fake IP addresses and config values. These functions need `init()`. Reads that Steam cannot answer yet return `null`.
+
+```js
+const client = steamworks.init(480)
+client.networkingUtils.initRelayNetworkAccess()
+// Ping data takes a few seconds to appear after relay access starts.
+const here = client.networkingUtils.getLocalPingLocation()
+const pops = client.networkingUtils.getPops() // id, code (for example 'iad') and ping for each data center
+const ms = here ? client.networkingUtils.estimatePingFromLocalHost(here.location) : null
+```
+
+- `getLocalPingLocation()` returns `{ location, ageSeconds }`, or `null` when Steam has no ping data yet. Pass `location` only to the functions in this namespace, and do not parse it yourself.
+- Units: pings are milliseconds, ages are seconds, and `getLocalTimestamp()` returns microseconds as a `bigint`. That timestamp is comparable only within one run of the process.
+- `estimatePingFromLocalHost()` and `estimatePingBetweenLocations()` return `null` when Steam cannot estimate, and throw when a location text is not understood.
+- `checkPingDataUpToDate(maxAgeSeconds)` returns `false` when the data is older than that, and Steam then starts a new measurement. Call it only when you need fresh data now, because Steam refreshes the data on its own.
+- `getRealIdentityForFakeIp()` throws with Steam's reason when the address is not a fake IP (`InvalidParameter`) or the mapping is unknown (`NoMatch`). Steam keeps the mapping for active connections and for a short time after they close.
+- Config values: the `setGlobalConfigValue*` and `setConnectionConfigValue*` functions return `true` when Steam accepts the value and `false` when it refuses it. Connection functions take the raw connection handle as a number. The `Connection` object does not expose that handle yet. `getConfigValue(valueId, connection?)` returns a number for `int32` and `float` values, a `bigint` for `int64` values, a string for `string` values, or `null`. Use `getConfigValueInfo()` for a value's name, type and scope, and `iterateGenericEditableConfigValues()` to list the value numbers.
+- Not in this binding: `SetDebugOutputFunction`, the `SetGlobalCallback_*` functions, `SetGlobalConfigValuePtr`, and `SetConfigValue`/`SetConfigValueStruct`. They need C function pointers or `void*` arguments.
+- Not verified against a live Steam client: the byte order of IPv4 numbers in `isFakeIpv4()` and `getIpv4FakeIpType()`, when ping data first appears, and whether every data center reports a code.
+
+### Timeline additions (`timeline`)
+
+Event handles and game phases on the Steam timeline. These functions need `init()`. If the Steam client does not provide the timeline, the functions that change it do nothing.
+
+```js
+const client = steamworks.init(480)
+const { TimelineEventClipPriority } = client.timeline
+const event = client.timeline.startRangeTimelineEvent('Boss fight', 'Round 1', 'steam_victory', 0, 0, TimelineEventClipPriority.Featured)
+if (event !== null) client.timeline.endRangeTimelineEvent(event, 0)
+client.timeline.setGamePhaseId('chapter-1')
+const answer = await client.timeline.doesGamePhaseRecordingExist('chapter-1')
+```
+
+- Event handles are `bigint` values, and `null` means the timeline is unavailable. A handle is valid only in this run of the game. Passing a value that is not a handle from this API throws.
+- Units: offsets and durations are seconds, measured from now. Negative offsets are in the past. `recordingMs` and `longestClipMs` are milliseconds.
+- A range event must be ended with `endRangeTimelineEvent()`. Steam discards range events that are still open when the game exits.
+- `doesEventRecordingExist()` and `doesGamePhaseRecordingExist()` return promises. They resolve during `runCallbacks()` and reject when the timeline is unavailable or Steam cannot answer.
+- A phase ID is at most 63 bytes and must not contain a NUL character. Calls with a longer ID throw.
+- `clipPriority` is `None`, `Standard` or `Featured`.
+- Not verified against a live Steam client: what the overlay shows for `openOverlayToGamePhase()` and `openOverlayToTimelineEvent()`, and how the timeline behaves on Steam clients that do not support it.
+
 ## Networking: `networking` and the New Namespaces
 
 Two families of networking APIs coexist. The `networking` namespace is the original P2P packet API (`sendP2PPacket`, `readP2PPacket`, `acceptP2PSession`), and it is unchanged. The new `networkingSockets`, `networkingMessages` and `networkingUtils` namespaces wrap Steam's Networking Sockets, Networking Messages and Networking Utils interfaces.

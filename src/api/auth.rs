@@ -183,4 +183,57 @@ pub mod auth {
             }
         }
     }
+
+    /// Requests an encrypted app ticket for this app, with optional bytes encrypted into it. Needs `init()`. This sends a request to Steam.
+    /// Resolves once Steam has the ticket; then read it with `getEncryptedAppTicket()`. Steam's answer is delivered through `runCallbacks()`, which `init()` already calls.
+    /// Rejects when Steam reports an error, when `dataToInclude` is larger than 2^31 - 1 bytes (nothing is sent). There is no timeout: if Steam never answers, the Promise stays pending and the outcome is unknown.
+    /// @param dataToInclude - optional bytes to encrypt into the ticket.
+    #[napi]
+    pub async fn request_encrypted_app_ticket(
+        data_to_include: Option<Buffer>,
+    ) -> Result<(), Error> {
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+        let data = data_to_include.map(|bytes| bytes.to_vec());
+        client
+            .user()
+            .request_encrypted_app_ticket(data.as_deref(), move |result| {
+                let _ = tx.send(result);
+            })
+            .map_err(|_| Error::from_reason("dataToInclude is larger than 2^31 - 1 bytes"))?;
+        crate::api::workshop::workshop::await_completion(rx, "requesting the encrypted app ticket")
+            .await
+    }
+
+    /// Returns the encrypted app ticket that `requestEncryptedAppTicket()` asked for. Needs `init()`. Does not send a request.
+    /// @returns the ticket as a Buffer to send to your server, or `null` when no ticket is ready.
+    #[napi]
+    pub fn get_encrypted_app_ticket() -> Option<Buffer> {
+        crate::client::get_client()
+            .user()
+            .encrypted_app_ticket()
+            .map(Buffer::from)
+    }
+
+    /// Requests a store checkout URL that signs in the in-game browser, then redirects to `redirectUrl`. Needs `init()`.
+    /// The SDK says the URL has a very short lifetime, so open it right away. Its auth cookie lasts a day, and the SDK suggests requesting a new URL about every 12 hours.
+    /// Resolves with the URL. Rejects when `redirectUrl` contains a NUL character (nothing is sent), or when Steam returns an empty URL. There is no timeout: if Steam never answers, the Promise stays pending.
+    /// @param redirectUrl - the page the store redirects to after checkout.
+    /// @returns the store authorization URL.
+    #[napi]
+    pub async fn request_store_auth_url(redirect_url: String) -> Result<String, Error> {
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+        client
+            .user()
+            .request_store_auth_url(&redirect_url, move |result| {
+                let _ = tx.send(result);
+            })
+            .map_err(|_| Error::from_reason("redirectUrl must not contain a NUL character"))?;
+        crate::api::workshop::workshop::await_completion(
+            rx,
+            "requesting the store authorization URL",
+        )
+        .await
+    }
 }

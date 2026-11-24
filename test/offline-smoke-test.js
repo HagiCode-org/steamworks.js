@@ -227,7 +227,11 @@ async function checkWorkshopNewArgumentValidation() {
     await assert.rejects(workshop.getAppDependencies(-1n), /non-negative integer/, 'a negative item id is refused for app dependencies')
 }
 
+for (const slice of ['stats-utils-apps', 'friends', 'user-remotestorage', 'inventory', 'http-netutils-timeline']) {
+    require(`./offline-${slice}-exports.js`)
+}
+
 checkWorkshopNewExports()
 checkWorkshopPathValidation().then(checkWorkshopNewArgumentValidation).then(() => {
-    console.log('offline smoke test passed (workshop, friends, stats, achievement, leaderboard, callback, networking, matchmaking servers, screenshots, timeline, remote play and supplemental exports are present)')
+    console.log('offline smoke test passed (workshop, friends, stats, achievement, leaderboard, callback, networking, matchmaking servers, screenshots, timeline, remote play, user, friends, inventory, HTTP, networking utils and supplemental exports are present)')
 })
