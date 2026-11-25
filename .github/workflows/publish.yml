@@ -279,3 +279,87 @@ jobs:
           echo "- Dist directory:" && ls -R dist
 
       - run: npm publish --tag ${{ steps.get_version.outputs.is_release == 'true' && 'latest' || 'dev' }}
+
+  cli-test:
+    # Offline tests of the swjs CLI and the CLI package's file list. It runs on every event this workflow handles, pull
+    # requests included. It needs no native build, no submodules and publishes nothing.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Run CLI tests
+        run: node --test cli/test/*.test.mjs
+
+      - name: Check CLI package contents
+        working-directory: cli
+        run: npm pack --dry-run --ignore-scripts
+
+  deploy-cli:
+    # Publishes @hagicode/steamworks-js-cli with the same version as the native package. It runs after deploy, so the exact
+    # native version it pins is already on npm. The guard is the same as deploy: only pushes to HagiCode-org/steamworks.js.
+    if: ${{ github.repository == 'HagiCode-org/steamworks.js' && github.event_name == 'push' }}
+
+    runs-on: ubuntu-latest
+    needs: [cli-test, deploy]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v4.2.0
+        with:
+          versionSpec: "6.x"
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v4.2.0
+
+      - name: Extract version from tag or GitVersion
+        id: get_version
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+              VERSION="${{ steps.gitversion.outputs.fullSemVer }}"
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set the CLI version and pin the native dependency
+        working-directory: cli
+        run: |
+          npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version
+          npm pkg set "dependencies[@hagicode/steamworks.js]=${{ steps.get_version.outputs.version }}"
+
+      - name: Publish CLI
+        working-directory: cli
+        run: npm publish --tag ${{ steps.get_version.outputs.is_release == 'true' && 'latest' || 'dev' }}
