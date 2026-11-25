@@ -18,7 +18,7 @@
         "url": "git+https://github.com/HagiCode-org/steamworks.js.git",
         "directory": "cli"
     },
-    "version": "0.0.1",
+    "version": "0.2.1",
     "type": "module",
     "bin": {
         "swjs": "bin/swjs.mjs"
@@ -34,7 +34,7 @@
         "node": ">=18.3"
     },
     "dependencies": {
-        "@hagicode/steamworks.js": ">=0.1.5"
+        "@hagicode/steamworks.js": "0.2.1"
     },
     "scripts": {
         "test": "node --test test/*.test.mjs",
