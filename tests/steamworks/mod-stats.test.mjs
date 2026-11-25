@@ -78,11 +78,12 @@ function withFixture(fn) {
   }
 }
 
-const run = (args, f, data) =>
-  spawnSync(process.execPath, [SCRIPT, ...args], {
+const runScript = (script, args, f, data) =>
+  spawnSync(process.execPath, [script, ...args], {
     encoding: 'utf8',
     env: { ...process.env, STEAMWORKS_JS: f.steam, FAKE_STEAM_DATA: JSON.stringify(data), FAKE_STEAM_LOG: f.log },
   });
+const run = (args, f, data) => runScript(SCRIPT, args, f, data);
 
 const listFiles = (dir) => {
   const out = [];
@@ -207,5 +208,29 @@ test('a game the account does not own stops the report and saves nothing', () =>
     assert.match(r.stderr, /333: this Steam account does not own app 333/);
     assert.doesNotMatch(r.stdout, /Beta/, 'no partial report may be printed');
     assert.deepEqual(listFiles(f.cache), [], 'no snapshot may be saved for a failed report');
+  });
+});
+
+test('a symbolic link to the script runs it exactly like the real path, and importing it through the link prints nothing', () => {
+  withFixture((f) => {
+    const link = path.join(f.dir, 'mod-stats-link.mjs');
+    fs.symlinkSync(SCRIPT, link);
+    const args = ['report', '--apps', '111,222', '--date', '2026-11-02', '--cache-dir', f.cache];
+    const viaReal = runScript(SCRIPT, args, f, DAY1);
+    const viaLink = runScript(link, args, f, DAY1);
+    assert.equal(viaReal.status, 0, viaReal.stderr);
+    assert.notEqual(viaReal.stdout.trim(), '', 'the real path prints a report');
+    assert.equal(viaLink.status, viaReal.status, 'same exit code through the link');
+    // The read time differs by a few milliseconds between the two runs; everything else must match exactly.
+    const withoutReadTime = (s) => s.replace(/读取时间（UTC）：.*/, 'read time');
+    assert.equal(withoutReadTime(viaLink.stdout), withoutReadTime(viaReal.stdout), 'same stdout through the link');
+    assert.equal(viaLink.stderr, viaReal.stderr, 'same stderr through the link');
+
+    // An importer (not the script) that loads the module through the link: no command runs, nothing is printed.
+    const importer = path.join(f.dir, 'importer.mjs');
+    fs.writeFileSync(importer, `await import(${JSON.stringify(pathToFileURL(link).href)});\nconsole.log('imported');\n`);
+    const imported = spawnSync(process.execPath, [importer], { encoding: 'utf8', env: { ...process.env, STEAMWORKS_JS: f.steam } });
+    assert.equal(imported.status, 0, imported.stderr);
+    assert.equal(imported.stdout, 'imported\n', 'the import itself prints nothing');
   });
 });

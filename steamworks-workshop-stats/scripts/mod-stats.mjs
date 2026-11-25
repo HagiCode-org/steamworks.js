@@ -14,11 +14,11 @@
 // steamworks.js is found like steam-workshop.mjs: STEAMWORKS_JS (a package folder with index.js), else the global
 // @hagicode/steamworks.js install. The Steam client must be running and logged in to the publishing account.
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_APPS = [3167020, 4348910];
 export const GAME_NAMES = {
@@ -297,7 +297,15 @@ export async function main(argv) {
   throw new Error('usage: mod-stats.mjs report [--apps A,B] [--date YYYY-MM-DD] [--cache-dir dir] [--format md|json]');
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+// Compare real paths on both sides: a symbolic link to this script must run it exactly like the real path does.
+const isEntrypoint = (() => {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(SELF);
+  } catch {
+    return false;
+  }
+})();
+if (isEntrypoint) {
   main(process.argv.slice(2)).catch((e) => {
     console.error(`error: ${e.message ?? e}`);
     process.exit(1);
