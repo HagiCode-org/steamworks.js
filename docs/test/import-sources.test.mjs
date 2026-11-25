@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -291,6 +292,30 @@ describe("atomic generation", () => {
       assert.throws(() => generateSite({ repoRoot: path.join(root, "src"), outDir, tmpBase }), /cannot read README\.md/);
       assert.equal(existsSync(outDir), false);
       assert.equal(existsSync(tmpBase), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("script entrypoints", () => {
+  test("check-registry-neutrality runs the same through a symbolic link as through its real path", () => {
+    const root = tempDir();
+    try {
+      const script = path.join(docsDir, "scripts", "check-registry-neutrality.mjs");
+      const link = path.join(root, "check-registry-neutrality-link.mjs");
+      symlinkSync(script, link);
+      const repo = path.join(root, "repo");
+      mkdirSync(repo);
+      writeFileSync(path.join(repo, "README.md"), "# clean\n");
+      execFileSync("git", ["init", "-q"], { cwd: repo });
+      execFileSync("git", ["add", "."], { cwd: repo });
+      const viaReal = spawnSync(process.execPath, [script, "--root", repo], { encoding: "utf8" });
+      const viaLink = spawnSync(process.execPath, [link, "--root", repo], { encoding: "utf8" });
+      assert.equal(viaReal.status, 0, viaReal.stderr);
+      assert.match(viaReal.stdout, /registry-neutrality: ok/);
+      assert.equal(viaLink.status, viaReal.status, "same exit code through the link");
+      assert.equal(viaLink.stdout, viaReal.stdout, "same stdout through the link");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

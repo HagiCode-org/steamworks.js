@@ -5,7 +5,7 @@
 // The payload directory sits at the repository root, as the publish workflow expects.
 // It exits non-zero, naming each missing input, before anything is written.
 
-import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, realpathSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,7 +34,14 @@ export function stagePayload({ docsDir = defaultDocsDir, repoRoot = defaultRepoR
   return target;
 }
 
-const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Compare real paths on both sides: a symbolic link to this script must run it exactly like the real path does.
+const isMain = (() => {
+  try {
+    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
 if (isMain) {
   try {
     const target = stagePayload();

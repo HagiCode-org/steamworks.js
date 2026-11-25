@@ -7,9 +7,9 @@
 // Usage: node scripts/check-registry-neutrality.mjs [--root <dir>] [--deny-host <host>]...
 //          [--allow-host <host>]... [--allow-tarball-prefix <url>]...
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 export const PUBLIC_REGISTRY_HOST = 'registry.npmjs.org';
 const PUBLIC_TARBALL_PREFIX = `https://${PUBLIC_REGISTRY_HOST}/`;
@@ -146,7 +146,15 @@ export function run(argv = process.argv.slice(2), io = { log: console.log, error
   return 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+// Compare real paths on both sides: a symbolic link to this script must run it exactly like the real path does.
+const isMain = (() => {
+  try {
+    return process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (isMain) {
   try {
     process.exitCode = run();
   } catch (error) {
