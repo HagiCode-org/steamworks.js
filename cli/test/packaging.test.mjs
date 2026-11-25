@@ -50,10 +50,11 @@ test('check-package reports missing files', () => {
     assert.equal(problems.filter((p) => /^missing /.test(p)).length, 4)
 })
 
-test('running the guard by hand fails on the committed placeholder version', () => {
+test('running the guard by hand passes on the committed, pinned manifest', () => {
     const r = spawnSync(process.execPath, [path.join(CLI_ROOT, 'scripts', 'check-package.mjs')], { encoding: 'utf8' })
-    assert.equal(r.status, 1)
-    assert.match(r.stderr, /placeholder version/)
+    assert.equal(r.status, 0, r.stderr)
+    assert.match(r.stdout, /@hagicode\/steamworks-js-cli \d+\.\d+\.\d+, dependency @hagicode\/steamworks\.js \d+\.\d+\.\d+/)
+    assert.doesNotMatch(r.stdout + r.stderr, /placeholder/)
 })
 
 test('the CLI package lists only its entry, source, README and license files', () => {
