@@ -1,0 +1,47 @@
+{
+    "name": "@hagicode/steamworks-js-cli",
+    "description": "HagiCode Steamworks JS CLI (SWJS): publish, update and inspect Steam Workshop items from the command line through the running Steam client.",
+    "keywords": [
+        "steam",
+        "steamworks",
+        "workshop",
+        "ugc",
+        "cli",
+        "swjs"
+    ],
+    "homepage": "https://github.com/HagiCode-org/steamworks.js/tree/main/cli#readme",
+    "bugs": {
+        "url": "https://github.com/HagiCode-org/steamworks.js/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/HagiCode-org/steamworks.js",
+        "directory": "cli"
+    },
+    "version": "0.0.1",
+    "type": "module",
+    "bin": {
+        "swjs": "bin/swjs.mjs"
+    },
+    "files": [
+        "bin/",
+        "src/",
+        "README.md",
+        "LICENSE"
+    ],
+    "license": "MIT",
+    "engines": {
+        "node": ">=18.3"
+    },
+    "dependencies": {
+        "@hagicode/steamworks.js": ">=0.1.5"
+    },
+    "scripts": {
+        "test": "node --test test/*.test.mjs",
+        "pack:check": "npm pack --dry-run --ignore-scripts",
+        "prepack": "node scripts/check-package.mjs"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
