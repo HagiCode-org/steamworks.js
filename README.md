@@ -124,6 +124,26 @@ require('steamworks.js').electronEnableSteamOverlay()
 For the production build, copy the relevant distro files from `sdk/redistributable_bin/{YOUR_DISTRO}` into the root of your build. If you are using electron-forge, look for [#75](https://github.com/HagiCode-org/steamworks.js/issues/75).
 
 
+## Command line (SWJS)
+
+`swjs` is a command line for Steam Workshop items, shipped as a separate package, [`@hagicode/steamworks-js-cli`](./cli/README.md) (the Steamworks JS CLI, short name SWJS). It uses the Steam client that is already running and logged in, so no password is typed.
+
+```sh
+npm i -g @hagicode/steamworks-js-cli
+swjs doctor --app-id 4348910                 # Node, binding, Steam client and app ownership
+swjs init ./my-mod --app-id 4348910          # workshop/ folder with templates; never overwrites
+swjs check ./my-mod                          # every problem at once
+swjs publish ./my-mod                        # dry run: prints the plan, sends nothing
+WORKSHOP_WRITE_CONFIRMED=1 swjs publish ./my-mod --yes
+```
+
+- Commands: `init`, `check`, `pack` (offline); `publish`, `update`, `preview`, `images list|upload|remove` (writes); `status`, `item`, `list`, `subscribed`, `doctor` (read-only).
+- Every write is a dry run unless `--yes` is given, and then also needs `WORKSHOP_WRITE_CONFIRMED=1`. The refusal is printed before anything is sent.
+- The item folder uses the same `workshop/workshop.json` layout as the `steamworks-workshop-publish` skill.
+- `--json` on the read commands prints one JSON document on standard output. Exit codes: 0 success, 1 failure or refused write, 2 usage error.
+
+Full command list, the item fields and the release notes: [cli/README.md](./cli/README.md).
+
 ## How to build
 
 > You **only** need to build if you are going to change something on this fork's code. If you just want to use the library in your game, see the [installation section](#installation).

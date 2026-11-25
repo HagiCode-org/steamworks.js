@@ -61,6 +61,13 @@ export const guidePages = [
     order: 6,
     sections: ["Release Process"],
   },
+  {
+    slug: "guide/command-line",
+    title: "Command line (SWJS)",
+    description: "The swjs command for Steam Workshop items: install, the item folder, the commands, dry-run writes and exit codes.",
+    order: 7,
+    sections: ["Command line (SWJS)"],
+  },
 ];
 
 // README "##" sections intentionally left off the site, with the reason.
