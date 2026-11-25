@@ -73,6 +73,9 @@ def require_confirmed_write(command: str) -> None:
 # Probably Stolen: 125 bytes accepted, 129 bytes cut to 128 with a broken character, 134 bytes refused).
 MAX_TITLE, MAX_DESCRIPTION, PREVIEW_WARN = 128, 8000, 1024 * 1024
 STEAM_SCRIPT = Path(__file__).resolve().with_name("steam-workshop.mjs")
+# Decoding for every subprocess that runs steam-workshop.mjs. Fixed to UTF-8 and never strict, so a stray byte (seen as 0x90
+# in a real upload, under a non-UTF-8 locale) cannot raise mid-read; the exit code, not the decoded text, decides success.
+TEXT_KW = dict(encoding="utf-8", errors="replace")
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 PLACEHOLDER = re.compile(r"TODO|\{\{")
 YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")  # a YouTube video id; Steam takes Workshop videos only as YouTube links
@@ -504,25 +507,28 @@ def cmd_upload(args) -> None:
     cmd += ["--tags", ",".join(tags)]  # always sent: an empty list clears the tags, as the item's tags say
     if video_ids:
         cmd += ["--videos", ",".join(video_ids)]  # sent only when listed, so an upload without videos is the same call as before
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, **TEXT_KW)
     needs_agreement = False
-    for line in proc.stdout:  # type: ignore[union-attr]
-        sys.stdout.write(line)
-        sys.stdout.flush()
-        m = re.match(r"ITEM_ID (\d+)", line)
-        if m and meta["publishedFileId"] != m.group(1):
-            if meta["publishedFileId"] != "0":
-                raise Fail(f"Steam reported item {m.group(1)} but workshop.json holds {meta['publishedFileId']}; stopped")
-            meta["publishedFileId"] = m.group(1)  # keep the id at once, before the upload can fail
-            save(meta, p)
-            print(f"saved publishedFileId {m.group(1)} to {p['file']} (commit it)")
-        if line.startswith("NEEDS_AGREEMENT"):
-            needs_agreement = True
-    if proc.wait() != 0:
+    try:
+        for line in proc.stdout:  # type: ignore[union-attr]
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            m = re.match(r"ITEM_ID (\d+)", line)
+            if m and meta["publishedFileId"] != m.group(1):
+                if meta["publishedFileId"] != "0":
+                    raise Fail(f"Steam reported item {m.group(1)} but workshop.json holds {meta['publishedFileId']}; stopped")
+                meta["publishedFileId"] = m.group(1)  # keep the id at once, before the upload can fail
+                save(meta, p)
+                print(f"saved publishedFileId {m.group(1)} to {p['file']} (commit it)")
+            if line.startswith("NEEDS_AGREEMENT"):
+                needs_agreement = True
+    finally:
+        returncode = proc.wait()  # always reap the child, even when the loop stopped early; the exit code alone decides
+    if returncode != 0:
         kept = meta["publishedFileId"]
         hint = (f"item {kept} is kept in workshop.json; run the same command again to update it"
                 if kept != "0" else "no item was created")
-        raise Fail(f"upload failed (exit {proc.returncode}); {hint}")
+        raise Fail(f"upload failed (exit {returncode}); {hint}")
     if needs_agreement:
         print("warning: the Workshop legal agreement is not accepted for this account; the item stays hidden until it is.")
 
@@ -545,7 +551,7 @@ def cmd_status(args) -> None:
         if shutil.which("node") is None:
             raise Fail("node is not on PATH (steam-workshop.mjs needs Node.js)")
         cmd = ["node", str(STEAM_SCRIPT), "info", "--app", str(meta["appId"]), "--item", str(meta["publishedFileId"])]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = subprocess.run(cmd, capture_output=True, **TEXT_KW)
         sys.stdout.write(r.stdout)
         if r.returncode != 0:
             raise Fail(r.stderr.strip() or f"steam-workshop.mjs info exited {r.returncode}")
@@ -559,7 +565,7 @@ def remote_info(meta: dict) -> dict:
     if shutil.which("node") is None:
         raise Fail("node is not on PATH (steam-workshop.mjs needs Node.js)")
     r = subprocess.run(["node", str(STEAM_SCRIPT), "info", "--app", str(meta["appId"]), "--item", item],
-                       capture_output=True, text=True)
+                       capture_output=True, **TEXT_KW)
     line = next((x for x in r.stdout.splitlines() if x.startswith("ITEM_INFO ")), None)
     if r.returncode != 0 or line is None:
         raise Fail(r.stderr.strip() or f"steam-workshop.mjs info exited {r.returncode}")
@@ -629,7 +635,7 @@ def cmd_images_upload(args) -> None:
     listing.write_text(json.dumps([str(f) for f in pending], ensure_ascii=False, indent=2) + "\n", "utf-8")
     cmd = ["node", str(STEAM_SCRIPT), "add-previews", "--app", str(meta["appId"]),
            "--item", str(meta["publishedFileId"]), "--files", str(listing)]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, **TEXT_KW)
     sys.stdout.write(r.stdout)
     if r.returncode != 0:
         sys.stderr.write(r.stderr)
@@ -665,7 +671,7 @@ def cmd_images_remove(args) -> None:
     listing.write_text(json.dumps(indexes, indent=2) + "\n", "utf-8")
     cmd = ["node", str(STEAM_SCRIPT), "remove-previews", "--app", str(meta["appId"]),
            "--item", str(meta["publishedFileId"]), "--indexes", str(listing)]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, **TEXT_KW)
     sys.stdout.write(r.stdout)
     if r.returncode != 0:
         sys.stderr.write(r.stderr)
@@ -730,14 +736,17 @@ def preview_targets(args) -> list[dict]:
 def run_preview_engine(t: dict, note: str, check: bool) -> tuple[int, list[str]]:
     cmd = ["node", str(STEAM_SCRIPT), "set-preview", "--app", str(t["app"]), "--item", t["id"], "--preview", str(t["file"]),
            "--changenote", note] + (["--check"] if check else [])
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, **TEXT_KW)
     lines = []
-    for line in proc.stdout:  # type: ignore[union-attr]
-        lines.append(line.rstrip("\n"))
-        if not line.startswith(("steam user", "steamworks.js")):
-            sys.stdout.write(line)
-            sys.stdout.flush()
-    return proc.wait(), lines
+    try:
+        for line in proc.stdout:  # type: ignore[union-attr]
+            lines.append(line.rstrip("\n"))
+            if not line.startswith(("steam user", "steamworks.js")):
+                sys.stdout.write(line)
+                sys.stdout.flush()
+    finally:
+        returncode = proc.wait()  # always reap the child, even when reading stopped early
+    return returncode, lines
 
 
 def verify_live_preview(url: str, file: Path) -> str:
@@ -860,7 +869,7 @@ def cmd_artwork(args) -> None:
         cmd = ["node", str(STEAM_SCRIPT), "publish", "--app", str(args.app_id), "--item", "0", "--file-type", "art",
                "--content", str(content), "--preview", str(image), "--translations", str(translations),
                "--visibility", "hidden", "--changenote", changenote]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = subprocess.run(cmd, capture_output=True, **TEXT_KW)
         sys.stdout.write(r.stdout)
         sys.stderr.write(r.stderr)
         error = (r.stderr.strip().splitlines() or [f"steam-workshop.mjs publish exited {r.returncode}"])[-1]
@@ -878,7 +887,7 @@ def cmd_artwork(args) -> None:
             outcomes["upload"] = ("failed", error)
         if created:
             info = subprocess.run(["node", str(STEAM_SCRIPT), "info", "--app", str(args.app_id), "--item", item],
-                                  capture_output=True, text=True)
+                                  capture_output=True, **TEXT_KW)
             line = next((x for x in info.stdout.splitlines() if x.startswith("ITEM_INFO ")), None)
             if info.returncode != 0 or line is None:
                 outcomes["read-back URL"] = ("failed", info.stderr.strip() or "the read-back did not return the item")
@@ -996,6 +1005,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    for stream in (sys.stdout, sys.stderr):
+        # Echoing a replaced character (U+FFFD) must not raise on a console that cannot show it, such as an ASCII stdout:
+        # that would end the run after the child already succeeded.
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     try:
         args.fn(args)
     except Fail as e:

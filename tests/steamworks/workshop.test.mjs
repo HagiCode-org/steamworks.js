@@ -30,6 +30,7 @@ const client = {
   workshop: {
     async createItem(appId, fileType) {
       log({ call: 'createItem', appId, fileType: fileType ?? null });
+      if (process.env.FAKE_STEAM_RAW_BYTE) process.stdout.write(Buffer.from([0x90, 0x0a])); // a line that is not valid UTF-8
       return { itemId: BigInt(${FAKE_ITEM_ID}), needsToAcceptAgreement: mode === 'agreement' };
     },
     updateItemWithCallback(itemId, details, appId, ok, err) {
@@ -69,6 +70,7 @@ const client = {
     },
     async getItem(id, config) {
       log({ call: 'getItem', itemId: String(id), includeAdditionalPreviews: config?.includeAdditionalPreviews ?? false });
+      if (process.env.FAKE_STEAM_RAW_BYTE) process.stdout.write(Buffer.from([0x90, 0x0a]));
       const item = {
         publishedFileId: id, title: 'Fake title', visibility: 2, timeUpdated: 1700000000, tags: ['a'],
         owner: { steamId64: process.env.FAKE_STEAM_OWNER || '76561190000000000' }, consumerAppId: Number(process.env.FAKE_STEAM_APP || 4348910),
@@ -300,6 +302,51 @@ test('status --remote reads the stored item from Steam', { skip }, () => {
   assert.equal(info.publishedFileId, FAKE_ITEM_ID);
   assert.equal(info.title, 'Fake title');
   assert.equal(info.visibility, 'hidden');
+});
+
+// Under a strict locale, Node output with a byte that is not valid UTF-8 (0x90) must not stop workshop.py: the marker lines
+// are still recognized, and the exit code alone decides the result. FAKE_STEAM_RAW_BYTE makes the fake steamworks.js print it.
+// PYTHONUTF8=1 makes argv, stdout and the child's output strictly UTF-8. The original text=True decoding then raises on 0x90
+// (not valid UTF-8), while the test's Chinese arguments still reach Python intact. An ASCII locale or PYTHONIOENCODING=ascii
+// would not do: the original code failed earlier, printing the Chinese title, or the Chinese arguments were garbled.
+const STRICT_LOCALE = { PYTHONUTF8: '1' };
+
+test('upload under a strict locale survives a 0x90 byte in the output and still saves the item id', { skip }, () => {
+  const f = fixture();
+  run(['init', f.item, '--app-id', '4348910', '--languages', 'english,schinese'], {}, f);
+  fillIn(f);
+  const r = run(['upload', f.item, '--yes', '--changenote', CHANGE_NOTE], { ...STRICT_LOCALE, FAKE_STEAM_RAW_BYTE: '1' }, f);
+  assert.equal(r.code, 0, r.text);
+  assert.doesNotMatch(r.text, /UnicodeDecodeError/);
+  assert.equal(readMeta(f).publishedFileId, FAKE_ITEM_ID, 'the ITEM_ID line after the bad byte is recognized');
+  assert.match(r.out, new RegExp(`ITEM_ID ${FAKE_ITEM_ID}`), 'the marker reaches the caller');
+  assert.match(r.out, /saved publishedFileId/);
+  assert.match(r.out, /URL https:\/\/steamcommunity\.com/, 'the result line after the bad byte is printed');
+});
+
+test('a captured read under a strict locale survives a 0x90 byte and still parses the ITEM_INFO line', { skip }, () => {
+  const f = fixture();
+  run(['init', f.item, '--app-id', '4348910', '--languages', 'english'], {}, f);
+  const meta = readMeta(f);
+  meta.publishedFileId = FAKE_ITEM_ID;
+  fs.writeFileSync(path.join(f.item, 'workshop', 'workshop.json'), JSON.stringify(meta, null, 2));
+  const status = run(['status', f.item, '--remote'], { ...STRICT_LOCALE, FAKE_STEAM_RAW_BYTE: '1' }, f);
+  assert.equal(status.code, 0, status.text);
+  assert.equal(JSON.parse(status.out.match(/ITEM_INFO (.*)/)[1]).publishedFileId, FAKE_ITEM_ID);
+  const images = run(['images', 'list', f.item], { ...STRICT_LOCALE, FAKE_STEAM_RAW_BYTE: '1' }, f);
+  assert.equal(images.code, 0, images.text);
+  assert.match(images.out, /0 additional preview\(s\) on Steam/);
+});
+
+test('a non-zero exit with undecodable output still reports the exit code and keeps the saved item id', { skip }, () => {
+  const f = fixture();
+  run(['init', f.item, '--app-id', '4348910', '--languages', 'english'], {}, f);
+  fillIn(f);
+  const r = run(['upload', f.item, '--yes'], { ...STRICT_LOCALE, FAKE_STEAM_RAW_BYTE: '1', FAKE_STEAM_MODE: 'fail-update' }, f);
+  assert.equal(r.code, 1, r.text);
+  assert.match(r.err, /upload failed \(exit 1\)/);
+  assert.doesNotMatch(r.text, /UnicodeDecodeError/);
+  assert.equal(readMeta(f).publishedFileId, FAKE_ITEM_ID, 'the created item id survives the failure');
 });
 
 test('upload fails clearly when steamworks.js is neither configured nor installed globally', { skip }, () => {
