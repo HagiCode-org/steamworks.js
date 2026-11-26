@@ -8,7 +8,7 @@
 
 ## Layout
 
-- `src/lib.rs`, `src/client.rs`, `src/api/*.rs`: one Rust module per Steam feature (`achievement`, `apps`, `auth`, `callback`, `cloud`, `input`, `localplayer`, `matchmaking`, `networking`, `overlay`, `stats`, `utils`, `workshop`, `workshop_item`).
+- `src/lib.rs`, `src/client.rs`, `src/api/*.rs`: one Rust module per Steam feature (`achievement`, `apps`, `auth`, `callback`, `cloud`, `friends`, `http`, `input`, `inventory`, `leaderboard`, `localplayer`, `matchmaking`, `matchmaking_servers`, `networking`, `networking_messages`, `networking_sockets`, `networking_utils`, `overlay`, `remote_play`, `screenshots`, `stats`, `timeline`, `utils`, `workshop`, `workshop_item`), declared in `src/api/mod.rs`.
 - `vendor/steamworks-rs`: git submodule (`https://github.com/HagiCode-org/steamworks-rs.git`), a path dependency with features `serde` and `raw-bindings`. Do not edit it. In a non-recursive clone it is empty; run `git submodule update --init --recursive` before building.
 - `build.js`: copies the Steam redistributable from `vendor/steamworks-rs/steamworks-sys/lib/steam/redistributable_bin/<folder>` into `dist/<folder>`, then runs `napi build` for the chosen target. It passes `--dts ../../client.d.ts`, so the build regenerates `client.d.ts`.
 - `index.js` loads `dist/<win64|linux64|osx>/steamworksjs.<triple>.node`. Supported: win32-x64, linux-x64, darwin-x64, darwin-arm64.
